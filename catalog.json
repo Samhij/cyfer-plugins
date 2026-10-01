@@ -21,42 +21,6 @@
       },
       "downloadUrl": "",
       "sourceUrl": "https://github.com/Samhij/cyfer-plugins/tree/main/plugins/widget-cijfers"
-    },
-    {
-      "id": "voorbeeld-info",
-      "name": "Voorbeeld",
-      "version": "1.0.0",
-      "description": "Minimale voorbeeld-pagina-plugin",
-      "author": "Sam Hijmans",
-      "kind": "page",
-      "nav": {
-        "label": "Voorbeeld",
-        "icon": "Sparkles",
-        "order": 90
-      },
-      "permissions": {
-        "api": ["/rest/v1/leerlingen"]
-      },
-      "downloadUrl": "",
-      "sourceUrl": "https://github.com/Samhij/cyfer-plugins/tree/main/plugins/voorbeeld-info"
-    },
-    {
-      "id": "leerlingen",
-      "name": "Leerlingen",
-      "version": "1.0.0",
-      "description": "Toont de leerlingen gekoppeld aan dit account",
-      "author": "Sam Hijmans",
-      "kind": "page",
-      "nav": {
-        "label": "Leerlingen",
-        "icon": "Users",
-        "order": 40
-      },
-      "permissions": {
-        "api": ["/rest/v1/leerlingen"]
-      },
-      "downloadUrl": "",
-      "sourceUrl": "https://github.com/Samhij/cyfer-plugins/tree/main/plugins/leerlingen"
     }
   ]
 }

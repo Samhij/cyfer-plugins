@@ -1,6 +1,27 @@
 {
-  "updatedAt": "2026-10-01T22:23:00.000Z",
+  "updatedAt": "2026-10-01T22:36:00.000Z",
   "plugins": [
+    {
+      "id": "widget-cijfers",
+      "name": "Cijfers",
+      "version": "1.0.0",
+      "description": "Voortgangs- en examencijfers op Overzicht",
+      "author": "Sam Hijmans",
+      "kind": "widget",
+      "nav": {
+        "label": "Cijfers",
+        "icon": "ChartColumn",
+        "order": 0
+      },
+      "permissions": {
+        "api": [
+          "/rest/v1/geldendvoortgangsdossierresultaten/leerling/*",
+          "/rest/v1/geldendexamendossierresultaten/leerling/*"
+        ]
+      },
+      "downloadUrl": "",
+      "sourceUrl": "https://github.com/Samhij/cyfer-plugins/tree/main/plugins/widget-cijfers"
+    },
     {
       "id": "voorbeeld-info",
       "name": "Voorbeeld",

@@ -17,8 +17,8 @@ access goes through a host proxy and a per-plugin path allowlist.
 | `lib/plugins/base-styles.ts` | Injected CSS tokens / helpers |
 | `lib/plugins/store.ts` | How Cyfers loads `catalog.json` from this repo |
 | `plugins/cyfers.d.ts` | Ambient TypeScript types for the SDK |
-| `plugins/voorbeeld-info` | Built-in page example (mirrors this repo’s sample) |
-| `plugins/widget-cijfers` | Built-in widget example |
+| `plugins/voorbeeld-info` | Local page sample (mirrors this repo) |
+| `plugins/cyfers.d.ts` | Ambient TypeScript types for the SDK |
 
 Prefer reading those files over inventing APIs.
 

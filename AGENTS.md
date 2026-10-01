@@ -47,9 +47,8 @@ Constraints enforced by CI and by Cyfers install:
 1. Copy `plugins/voorbeeld-info` → `plugins/<your-id>`
 2. Edit `manifest.json` (unique `id`, `name`, `kind`, `nav`, minimal `permissions.api`)
 3. Build UI under `ui/` (plain HTML/CSS/JS — no bundler required)
-4. Add/update an entry in `catalog.json` so the in-app store can list it
-5. Locally test: zip the plugin folder and upload under **Plugins** in Cyfers (`npm run dev` in `somtoday-login`)
-6. Open a PR using `.github/PULL_REQUEST_TEMPLATE.md`
+4. Run `python3 scripts/generate-catalog.py`, then smoke-test via Cyfers zip upload
+5. Open a pull request
 
 Zip layout Cyfers expects:
 
@@ -129,10 +128,17 @@ Allowlist globs: `*` matches one path segment (not `/`). Example:
 
 Cyfers reads this file (default URL:
 `https://raw.githubusercontent.com/Samhij/cyfer-plugins/main/catalog.json`).
-Each entry should mirror the plugin’s public metadata plus optional
-`downloadUrl` / `sourceUrl` / `sha256`.
 
-When adding a plugin for the store, update `catalog.json` in the same PR.
+Generated from every `plugins/*/manifest.json` with `"listed": false` skipped
+(by `scripts/generate-catalog.py`; sort: `nav.order`, then label). Includes
+`sourceUrl` pointing at the plugin tree.
+
+```bash
+python3 scripts/generate-catalog.py          # write
+python3 scripts/generate-catalog.py --check  # CI / PR gate
+```
+
+Do not hand-edit. CI regenerates and commits on push to `main`.
 
 ## Security & agent guardrails
 
@@ -146,13 +152,13 @@ When adding a plugin for the store, update `catalog.json` in the same PR.
 
 ## Validation
 
-`.github/workflows/validate.yml` checks on PRs/pushes that touch `plugins/**` or
-`catalog.json`:
+`.github/workflows/validate.yml` on PRs/pushes that touch `plugins/**` or catalog tooling:
 
 - Directory name / `id` kebab-case and uniqueness
 - Manifest fields and `permissions.api` shape
 - Only `manifest.json` + `ui/**` files present
 - Declared `entry` file exists
+- `catalog.json` matches generated output (`--check` on PRs; regenerate+commit on `main`)
 
 ## Further reading
 

@@ -25,7 +25,11 @@ Max **2 MB**. Only `manifest.json` and files under `ui/` are allowed.
 
 ## Catalog
 
-`catalog.json` lists published plugins for the Cyfers app. CI regenerates it on `main`.
+`catalog.json` is generated from `plugins/*/manifest.json` by
+`scripts/generate-catalog.py`. CI regenerates and commits it on every push to
+`main`; pull requests must keep it up to date (`python3 scripts/generate-catalog.py`).
+
+Do not hand-edit `catalog.json`.
 
 ## Security
 

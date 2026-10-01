@@ -6,6 +6,7 @@
   "author": "Sam Hijmans",
   "kind": "page",
   "entry": "ui/index.html",
+  "listed": false,
   "nav": {
     "label": "Voorbeeld",
     "icon": "Sparkles",

@@ -5,19 +5,29 @@ on:
     paths:
       - "plugins/**"
       - "catalog.json"
+      - "scripts/generate-catalog.py"
       - ".github/workflows/validate.yml"
   push:
     branches: [main]
     paths:
       - "plugins/**"
       - "catalog.json"
+      - "scripts/generate-catalog.py"
       - ".github/workflows/validate.yml"
+
+permissions:
+  contents: read
 
 jobs:
   validate:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Needed so the catalog job can push a follow-up commit on main.
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Validate plugin manifests and layout
         run: |
@@ -97,3 +107,22 @@ jobs:
           done
 
           echo "All plugins valid."
+
+      - name: Check catalog.json is current
+        if: github.event_name == 'pull_request'
+        run: python3 scripts/generate-catalog.py --check
+
+      - name: Regenerate catalog.json
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          set -euo pipefail
+          python3 scripts/generate-catalog.py
+          if git diff --quiet -- catalog.json; then
+            echo "catalog.json already up to date"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add catalog.json
+          git commit -m "Regenerate catalog.json"
+          git push

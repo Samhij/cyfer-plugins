@@ -24,6 +24,7 @@ Required fields:
 | `entry` | Usually `ui/index.html` |
 | `nav.label` / `nav.icon` / `nav.order` | Lucide icon name in PascalCase |
 | `permissions.api` | Glob paths under `/rest/` |
+| `listed` | Optional; set `false` to keep a template plugin out of the store |
 
 ## Local test in Cyfers
 
@@ -32,3 +33,11 @@ Zip the plugin folder and upload it under **Plugins** in the Cyfers app.
 ## Pull requests
 
 Use the PR template. Maintainers review API permissions carefully before merge.
+
+After changing plugins, refresh the store listing:
+
+```bash
+python3 scripts/generate-catalog.py
+```
+
+CI also regenerates `catalog.json` on `main`; PRs fail if it is out of date.

@@ -1,0 +1,101 @@
+name: Validate plugins
+
+on:
+  pull_request:
+    paths:
+      - "plugins/**"
+      - "catalog.json"
+      - ".github/workflows/validate.yml"
+  push:
+    branches: [main]
+    paths:
+      - "plugins/**"
+      - "catalog.json"
+      - ".github/workflows/validate.yml"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate plugin manifests and layout
+        run: |
+          set -euo pipefail
+          ID_RE='^[a-z0-9]+(-[a-z0-9]+)*$'
+          declare -A seen=()
+
+          shopt -s nullglob
+          for dir in plugins/*/; do
+            id="$(basename "$dir")"
+            echo "Checking $id"
+
+            if [[ ! "$id" =~ $ID_RE ]]; then
+              echo "Invalid directory name: $id" >&2
+              exit 1
+            fi
+            if [[ -n "${seen[$id]+x}" ]]; then
+              echo "Duplicate id: $id" >&2
+              exit 1
+            fi
+            seen[$id]=1
+
+            manifest="$dir/manifest.json"
+            if [[ ! -f "$manifest" ]]; then
+              echo "Missing manifest.json in $dir" >&2
+              exit 1
+            fi
+
+            python3 - "$manifest" "$id" <<'PY'
+          import json, re, sys
+          path, expected_id = sys.argv[1], sys.argv[2]
+          with open(path, encoding="utf-8") as f:
+              data = json.load(f)
+          id_re = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+          pid = str(data.get("id", "")).strip()
+          if not id_re.match(pid):
+              raise SystemExit(f"manifest.id must be kebab-case: {pid!r}")
+          if pid != expected_id:
+              raise SystemExit(f"manifest.id {pid!r} must match directory {expected_id!r}")
+          if not str(data.get("name", "")).strip():
+              raise SystemExit("manifest.name is required")
+          kind = str(data.get("kind", "page")).strip().lower()
+          if kind not in ("page", "widget"):
+              raise SystemExit('manifest.kind must be "page" or "widget"')
+          entry = str(data.get("entry", "ui/index.html")).strip().lstrip("/")
+          if not entry.startswith("ui/") or ".." in entry:
+              raise SystemExit("manifest.entry must be under ui/")
+          nav = data.get("nav")
+          if not isinstance(nav, dict):
+              raise SystemExit("manifest.nav is required")
+          perms = data.get("permissions")
+          if not isinstance(perms, dict) or not isinstance(perms.get("api"), list):
+              raise SystemExit("manifest.permissions.api must be a list")
+          for pattern in perms["api"]:
+              p = str(pattern).strip()
+              if not p.startswith("/rest/") or ".." in p:
+                  raise SystemExit(f"Invalid API path: {p}")
+          print("OK", pid)
+          PY
+
+            while IFS= read -r -d '' file; do
+              rel="${file#$dir}"
+              case "$rel" in
+                manifest.json|ui|ui/*) ;;
+                *)
+                  echo "Disallowed file: $dir$rel" >&2
+                  exit 1
+                  ;;
+              esac
+            done < <(find "$dir" -type f -print0)
+
+            if [[ ! -f "$dir$entry" ]]; then
+              entry="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["entry"])' "$manifest")"
+              if [[ ! -f "$dir$entry" ]]; then
+                echo "Entry missing: $dir$entry" >&2
+                exit 1
+              fi
+            fi
+          done
+
+          echo "All plugins valid."

@@ -1,0 +1,17 @@
+{
+  "id": "voorbeeld-info",
+  "name": "Voorbeeld",
+  "version": "1.0.0",
+  "description": "Minimale voorbeeld-pagina-plugin",
+  "author": "Sam Hijmans",
+  "kind": "page",
+  "entry": "ui/index.html",
+  "nav": {
+    "label": "Voorbeeld",
+    "icon": "Sparkles",
+    "order": 90
+  },
+  "permissions": {
+    "api": ["/rest/v1/leerlingen"]
+  }
+}

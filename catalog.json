@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-01T00:00:00.000Z",
+  "updatedAt": "2026-10-01T22:23:00.000Z",
   "plugins": [
     {
       "id": "voorbeeld-info",
@@ -18,6 +18,24 @@
       },
       "downloadUrl": "",
       "sourceUrl": "https://github.com/Samhij/cyfer-plugins/tree/main/plugins/voorbeeld-info"
+    },
+    {
+      "id": "leerlingen",
+      "name": "Leerlingen",
+      "version": "1.0.0",
+      "description": "Toont de leerlingen gekoppeld aan dit account",
+      "author": "Sam Hijmans",
+      "kind": "page",
+      "nav": {
+        "label": "Leerlingen",
+        "icon": "Users",
+        "order": 40
+      },
+      "permissions": {
+        "api": ["/rest/v1/leerlingen"]
+      },
+      "downloadUrl": "",
+      "sourceUrl": "https://github.com/Samhij/cyfer-plugins/tree/main/plugins/leerlingen"
     }
   ]
 }

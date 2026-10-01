@@ -1,0 +1,17 @@
+{
+  "id": "leerlingen",
+  "name": "Leerlingen",
+  "version": "1.0.0",
+  "description": "Toont de leerlingen gekoppeld aan dit account",
+  "author": "Sam Hijmans",
+  "kind": "page",
+  "entry": "ui/index.html",
+  "nav": {
+    "label": "Leerlingen",
+    "icon": "Users",
+    "order": 40
+  },
+  "permissions": {
+    "api": ["/rest/v1/leerlingen"]
+  }
+}

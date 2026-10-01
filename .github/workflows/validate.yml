@@ -89,12 +89,10 @@ jobs:
               esac
             done < <(find "$dir" -type f -print0)
 
+            entry="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(str(d.get("entry","ui/index.html")).strip().lstrip("/"))' "$manifest")"
             if [[ ! -f "$dir$entry" ]]; then
-              entry="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["entry"])' "$manifest")"
-              if [[ ! -f "$dir$entry" ]]; then
-                echo "Entry missing: $dir$entry" >&2
-                exit 1
-              fi
+              echo "Entry missing: $dir$entry" >&2
+              exit 1
             fi
           done
 

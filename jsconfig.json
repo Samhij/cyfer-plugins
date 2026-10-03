@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "checkJs": true,
+    "noEmit": true,
+    "target": "ES2022",
+    "lib": ["DOM", "ES2022"],
+    "strict": false,
+    "module": "ESNext",
+    "moduleResolution": "bundler"
+  },
+  "include": ["plugins/**/*", "types/**/*"]
+}

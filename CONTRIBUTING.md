@@ -26,6 +26,14 @@ Required fields:
 | `permissions.api` | Glob paths under `/rest/` |
 | `listed` | Optional; set `false` to keep a template plugin out of the store |
 
+## TypeScript / JSDoc types
+
+Shared plugin types live in [`types/`](types/) (`api.ts` + ambient `globals.d.ts`).
+The root `jsconfig.json` wires them into every `plugins/*/ui/*.js` file for IDE
+autocomplete. Prefer JSDoc annotations (see `plugins/widget-cijfers`) over shipping
+a bundler. Do not copy type files into your plugin directory — CI rejects anything
+outside `manifest.json` + `ui/`.
+
 ## Local test in Cyfers
 
 Zip the plugin folder and upload it under **Plugins** in the Cyfers app.

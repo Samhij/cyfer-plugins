@@ -1,0 +1,14 @@
+{
+  "name": "@cyfers/plugin-types",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shared TypeScript types for Cyfers plugins (SDK, manifest, Somtoday REST shapes)",
+  "types": "./types/api.ts",
+  "exports": {
+    ".": "./types/api.ts",
+    "./globals": "./types/globals.d.ts"
+  },
+  "files": [
+    "types"
+  ]
+}

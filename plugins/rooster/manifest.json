@@ -1,0 +1,19 @@
+{
+  "id": "rooster",
+  "name": "Rooster",
+  "version": "1.0.0",
+  "description": "Weekrooster (ma–vr) met vorige/volgende week",
+  "author": "Sam Hijmans",
+  "kind": "page",
+  "entry": "ui/index.html",
+  "nav": {
+    "label": "Rooster",
+    "icon": "CalendarDays",
+    "order": 10
+  },
+  "permissions": {
+    "api": [
+      "/rest/v1/afspraakitems/*/jaar/*/week/*"
+    ]
+  }
+}

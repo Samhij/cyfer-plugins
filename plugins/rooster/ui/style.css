@@ -1,0 +1,128 @@
+/*
+ * Host injects styles/plugin-base.css at runtime — do not @import it here.
+ * Open the cyfer-plugins repo root in VS Code/Cursor for --token / class autocomplete.
+ */
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.85rem 1.25rem;
+  margin-bottom: 1.1rem;
+}
+
+.toolbar-text h1 {
+  margin-bottom: 0.2rem;
+}
+
+.toolbar-text .lede {
+  margin: 0;
+}
+
+.toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+#status {
+  margin-bottom: 0.85rem;
+}
+
+#status.error {
+  color: var(--danger);
+  background: var(--danger-bg);
+  padding: 0.65rem 0.85rem;
+  border-radius: 2px;
+}
+
+.days {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 720px) {
+  .days {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    align-items: start;
+    gap: 0.75rem;
+  }
+}
+
+.day {
+  min-width: 0;
+}
+
+.day-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.45rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.day-heading h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.day-heading .date {
+  color: var(--muted);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.day.today .day-heading h2 {
+  color: var(--accent);
+}
+
+.lessons {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.lesson {
+  padding: 0.55rem 0.65rem;
+  background: var(--bg-elevated);
+  border-left: 3px solid var(--accent);
+}
+
+.lesson-time {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.55rem;
+  margin-bottom: 0.2rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.lesson-period {
+  font-weight: 500;
+}
+
+.lesson-subject {
+  margin: 0;
+  font-weight: 600;
+  font-size: 0.95rem;
+  line-height: 1.25;
+}
+
+.lesson-meta {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.day-empty {
+  margin: 0.15rem 0 0;
+}

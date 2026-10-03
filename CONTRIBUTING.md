@@ -70,6 +70,9 @@ Override the scan root with `CYFERS_PLUGIN_DEV_DIR=/absolute/path/to/plugins` if
 repos are not siblings. Packaged Cyfers builds only honor that env var (they do not
 auto-load a sibling checkout).
 
+Example page plugin with week navigation: `plugins/rooster` (schedule via
+`/rest/v1/afspraakitems/{studentId}/jaar/{year}/week/{week}`).
+
 ### Zip upload (still supported)
 
 Zip the plugin folder and upload it under **Plugins** in the Cyfers app.

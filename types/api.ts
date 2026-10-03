@@ -190,6 +190,58 @@ export type SomtodayAfspraak = SomtodayEntity & {
   };
 };
 
+/**
+ * Afspraak item type from the student schedule endpoint.
+ * Observed in NONtoday/leerling-source (`RAfspraakItem`).
+ */
+export type SomtodayAfspraakItemType =
+  | "INDIVIDUEEL"
+  | "ROOSTER"
+  | "PRIVE"
+  | "BESCHERMD"
+  | "EXTERN"
+  | "OUDERAVOND"
+  | "EXAMEN"
+  | "ROOSTERTOETS"
+  | "ONBEKEND"
+  | string;
+
+/**
+ * `GET /rest/v1/afspraakitems/{studentId}/jaar/{isoYear}/week/{isoWeek}` item.
+ *
+ * Assumptions (inferred from NONtoday leerling app + community clients; not a
+ * live-checked Cyfers session):
+ * - Response envelope is `{ items?: SomtodayAfspraakItem[] }` (optional
+ *   `statusNotifications` ignored by plugins).
+ * - `jaar` / `week` are ISO week-year and ISO week number (Monday-based).
+ * - `vak` and `lesgroepen` are top-level (unlike `/rest/v1/afspraken`, which
+ *   often nests vak under `additionalObjects`).
+ * - Teacher names: `docentNamen`; with `?additional=docentAfkortingen` the
+ *   abbreviations may also appear under `additionalObjects.docentAfkortingen`.
+ * - Timestamps are local-wall ISO strings without timezone (`YYYY-MM-DDTHH:mm:ss`).
+ */
+export type SomtodayAfspraakItem = SomtodayEntity & {
+  uniqueIdentifier?: string;
+  afspraakItemType?: SomtodayAfspraakItemType;
+  beginDatumTijd?: string;
+  eindDatumTijd?: string;
+  beginLesuur?: number;
+  eindLesuur?: number;
+  titel?: string;
+  omschrijving?: string;
+  locatie?: string;
+  vak?: SomtodayVak;
+  lesgroepen?: SomtodayLesgroep[];
+  /** Teacher display names (official leerling client). */
+  docentNamen?: string[];
+  bijlagen?: unknown[];
+  aantalToekomstigeHerhalingen?: number;
+  additionalObjects?: {
+    docentAfkortingen?: string;
+    [key: string]: unknown;
+  };
+};
+
 export type SomtodayAbsentieReden = SomtodayEntity & {
   absentieSoort?: string;
   afkorting?: string;

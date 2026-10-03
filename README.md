@@ -57,6 +57,7 @@ Student id comes from `cyfers.getContext().students[].id` or
 | `/rest/v1/geldendvoortgangsdossierresultaten/leerling/*` | Progress grades for a student |
 | `/rest/v1/geldendexamendossierresultaten/leerling/*` | Exam grades for a student |
 | `/rest/v1/afspraken` | Schedule / appointments (often with `begindatum` / `einddatum`) |
+| `/rest/v1/afspraakitems/*/jaar/*/week/*` | Weekly student schedule (ISO year + week; see `plugins/rooster`) |
 | `/rest/v1/absentiemeldingen` | Absence reports |
 | `/rest/v1/studiewijzers` | Study guides |
 | `/rest/v1/studiewijzeritemafspraaktoekenningen` | Homework linked to appointments |

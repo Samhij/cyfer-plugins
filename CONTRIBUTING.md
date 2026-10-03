@@ -34,7 +34,28 @@ autocomplete. Prefer JSDoc annotations (see `plugins/widget-cijfers`) over shipp
 a bundler. Do not copy type files into your plugin directory — CI rejects anything
 outside `manifest.json` + `ui/`.
 
-## Local test in Cyfers
+## Local preview in Cyfers (recommended)
+
+Clone this repo **next to** [`somtoday-login`](https://github.com/Samhij/somtoday-login)
+so the layout is:
+
+```text
+parent/
+  somtoday-login/
+  cyfer-plugins/plugins/<your-id>/
+```
+
+1. In `somtoday-login`, run `npm run dev` and sign in.
+2. Open **Plugins** → section **Ontwikkeling**.
+3. Click **Laden** on your plugin (no zip).
+4. Edit files under `plugins/<id>/ui/` (and `manifest.json`); the host reloads the
+   preview automatically, or click **Herladen**.
+
+Override the scan root with `CYFERS_PLUGIN_DEV_DIR=/absolute/path/to/plugins` if the
+repos are not siblings. Packaged Cyfers builds only honor that env var (they do not
+auto-load a sibling checkout).
+
+### Zip upload (still supported)
 
 Zip the plugin folder and upload it under **Plugins** in the Cyfers app.
 

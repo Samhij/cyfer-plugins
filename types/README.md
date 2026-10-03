@@ -19,3 +19,5 @@ npm run sync:plugin-types
 ```
 
 Do **not** put type files inside `plugins/<id>/` — CI only allows `manifest.json` + `ui/`.
+
+For CSS token / class autocomplete, see [`styles/README.md`](../styles/README.md).

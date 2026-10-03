@@ -14,9 +14,10 @@ access goes through a host proxy and a per-plugin path allowlist.
 | `lib/plugins/manifest.ts` | Manifest validation (types imported from vendored copy of `types/`) |
 | `lib/plugins/sdk.ts` | Injected `window.cyfers` bridge |
 | `lib/plugins/match.ts` | `/rest/` glob allowlist matching (`*` = one path segment) |
-| `lib/plugins/base-styles.ts` | Injected CSS tokens / helpers |
+| `lib/plugins/base-styles.ts` | Runtime injection of vendored `styles/plugin-base.css` + font links |
 | `lib/plugins/store.ts` | How Cyfers loads `catalog.json` from this repo |
 | `vendor/cyfer-plugin-types/` | Vendored copy of this repo’s `types/` (keep in sync) |
+| `vendor/cyfer-plugin-styles/` | Vendored copy of this repo’s `styles/plugin-base.css` |
 | `plugins/voorbeeld-info` | Local page sample (mirrors this repo) |
 
 Prefer reading those files over inventing APIs.
@@ -27,11 +28,16 @@ Prefer reading those files over inventing APIs.
 types/
   api.ts                 # exported plugin-facing types (source of truth)
   globals.d.ts           # ambient `cyfers` + Somtoday* for IDE / JSDoc
+styles/
+  plugin-base.css        # host-injected CSS (authoring SoT; not in plugin zips)
+  css-custom-data.json   # VS Code/Cursor CSS variable autocomplete
+  html-custom-data.json  # VS Code/Cursor class-name hints
 plugins/<id>/
   manifest.json          # required
   ui/
     index.html           # usual entry
     *.css / *.js / …     # optional assets
+.vscode/settings.json    # css.customData / html.customData → styles/
 jsconfig.json            # includes plugins/** + types/** for autocomplete
 package.json             # `@cyfers/plugin-types` (types-only, private)
 catalog.json             # store listing consumed by Cyfers
@@ -57,7 +63,10 @@ Constraints enforced by CI and by Cyfers install:
 5. Run `python3 scripts/generate-catalog.py`, then open a pull request
 
 When changing SDK / Somtoday shapes, edit `types/api.ts` (and keep `globals.d.ts`
-in sync if you add exports). Ask the host repo to re-run `scripts/sync-plugin-types.js`.
+in sync if you add exports). Ask the host repo to re-run `npm run sync:plugin-types`.
+
+When changing injected CSS tokens/helpers, edit `styles/plugin-base.css` (and keep
+the custom-data JSON files in sync). Ask the host to re-run `npm run sync:plugin-styles`.
 
 Zip layout Cyfers expects:
 
@@ -107,6 +116,10 @@ Relative `src` / `href` are rewritten to the plugin asset API. Leave
 `https:`, `data:`, `blob:`, and `#` URLs alone.
 
 ### CSS tokens / helpers (injected)
+
+Authoring source: [`styles/plugin-base.css`](styles/plugin-base.css). Open the
+repo root so `.vscode/settings.json` loads custom data for `var(--…)` and class
+hints. Do not ship this file inside plugin zips.
 
 `--ink`, `--muted`, `--line`, `--accent`, `--accent-soft`, `--bg-elevated`,
 `--danger`, `--danger-bg`, `--font-body`, `--font-display`

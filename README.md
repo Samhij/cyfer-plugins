@@ -14,8 +14,12 @@ Fork this repo, add your plugin under `plugins/`, and open a pull request. After
    (see [CONTRIBUTING.md](CONTRIBUTING.md)); no zip required while iterating
 6. Open a pull request
 
-Open the repo in VS Code / Cursor for `cyfers.*` and `Somtoday*` autocomplete
-(repo-root `jsconfig.json` + [`types/`](types/)). Type files stay outside plugin zips.
+Open the **repo root** in VS Code / Cursor for autocomplete:
+
+- `cyfers.*` / `Somtoday*` — `jsconfig.json` + [`types/`](types/)
+- CSS tokens (`--ink`, `--accent`, …) and helper classes — [`.vscode/settings.json`](.vscode/settings.json) + [`styles/`](styles/)
+
+Types and base styles stay outside plugin zips; Cyfers injects the stylesheet at runtime.
 
 Zip layout Cyfers expects:
 

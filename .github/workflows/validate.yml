@@ -5,6 +5,8 @@ on:
     paths:
       - "plugins/**"
       - "types/**"
+      - "styles/**"
+      - ".vscode/settings.json"
       - "jsconfig.json"
       - "package.json"
       - "catalog.json"
@@ -15,6 +17,8 @@ on:
     paths:
       - "plugins/**"
       - "types/**"
+      - "styles/**"
+      - ".vscode/settings.json"
       - "jsconfig.json"
       - "package.json"
       - "catalog.json"

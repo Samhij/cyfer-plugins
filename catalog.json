@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-01T22:48:09Z",
+  "updatedAt": "2026-10-03T18:05:18Z",
   "plugins": [
     {
       "id": "widget-cijfers",
@@ -21,6 +21,26 @@
       },
       "downloadUrl": "",
       "sourceUrl": "https://github.com/Samhij/cyfer-plugins/tree/main/plugins/widget-cijfers"
+    },
+    {
+      "id": "rooster",
+      "name": "Rooster",
+      "version": "1.0.0",
+      "description": "Weekrooster (ma–vr) met vorige/volgende week",
+      "author": "Sam Hijmans",
+      "kind": "page",
+      "nav": {
+        "label": "Rooster",
+        "icon": "CalendarDays",
+        "order": 10
+      },
+      "permissions": {
+        "api": [
+          "/rest/v1/afspraakitems/*/jaar/*/week/*"
+        ]
+      },
+      "downloadUrl": "",
+      "sourceUrl": "https://github.com/Samhij/cyfer-plugins/tree/main/plugins/rooster"
     }
   ]
 }

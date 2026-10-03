@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1" name="viewport" />
+  <title>Rooster</title>
+  <link href="style.css" rel="stylesheet" />
+</head>
+<body>
+  <header class="toolbar">
+    <div class="toolbar-text">
+      <h1>Rooster</h1>
+      <p class="lede" id="weekLabel">Laden…</p>
+    </div>
+    <div class="toolbar-actions" role="group" aria-label="Weeknavigatie">
+      <button type="button" id="prevWeek" aria-label="Vorige week">← Vorige</button>
+      <button type="button" id="thisWeek" class="primary">Deze week</button>
+      <button type="button" id="nextWeek" aria-label="Volgende week">Volgende →</button>
+    </div>
+  </header>
+
+  <div id="status" class="muted" hidden></div>
+  <div id="days" class="days" aria-live="polite"></div>
+
+  <script src="script.js"></script>
+</body>
+</html>

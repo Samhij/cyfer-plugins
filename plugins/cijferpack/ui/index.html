@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1" name="viewport" />
+  <title>Cijferpack</title>
+  <link href="style.css" rel="stylesheet" />
+</head>
+<body>
+  <header class="pack-header">
+    <div>
+      <h1>Cijferpack</h1>
+      <p class="lede" id="subtitle">Laden…</p>
+    </div>
+    <div class="pack-header-actions">
+      <button type="button" id="replayBtn" class="ghost" hidden>Opnieuw openen</button>
+    </div>
+  </header>
+
+  <div id="status" class="muted" hidden></div>
+
+  <section id="intro" class="stage stage-intro" aria-live="polite">
+    <div class="arena">
+      <div class="rays" aria-hidden="true"></div>
+      <div class="particles" id="particles" aria-hidden="true"></div>
+      <div class="pack" id="pack" aria-hidden="true">
+        <div class="pack-glow"></div>
+        <div class="pack-body">
+          <span class="pack-badge">CYFERS</span>
+          <strong class="pack-title">Cijferpakket</strong>
+          <span class="pack-count" id="packCount">— kaarten</span>
+        </div>
+      </div>
+      <div class="flash" id="flash" aria-hidden="true"></div>
+    </div>
+    <div class="intro-copy">
+      <p class="intro-tagline">Trek je cijfers. Elke kaart telt.</p>
+      <button type="button" id="openBtn" class="primary open-cta" disabled>
+        Open cijferpakket
+      </button>
+    </div>
+  </section>
+
+  <section id="reveal" class="stage stage-reveal" hidden aria-live="polite">
+    <div class="reveal-stage">
+      <div class="rays reveal-rays" aria-hidden="true"></div>
+      <div id="revealCardHost" class="reveal-card-host"></div>
+      <p class="reveal-progress muted" id="revealProgress"></p>
+      <button type="button" id="skipBtn" class="ghost">Alle kaarten tonen</button>
+    </div>
+  </section>
+
+  <section id="gallery" class="stage stage-gallery" hidden>
+    <div class="gallery-bar">
+      <h2>Jouw pack</h2>
+      <p class="muted" id="galleryMeta"></p>
+    </div>
+    <div id="galleryGrid" class="gallery-grid"></div>
+  </section>
+
+  <script src="script.js"></script>
+</body>
+</html>

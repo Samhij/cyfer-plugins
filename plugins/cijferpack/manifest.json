@@ -1,0 +1,20 @@
+{
+  "id": "cijferpack",
+  "name": "Cijferpack",
+  "version": "1.0.0",
+  "description": "Open je cijfers als een dramatisch FIFA-stijl pakket",
+  "author": "Sam Hijmans",
+  "kind": "page",
+  "entry": "ui/index.html",
+  "nav": {
+    "label": "Cijferpack",
+    "icon": "Package",
+    "order": 15
+  },
+  "permissions": {
+    "api": [
+      "/rest/v1/geldendvoortgangsdossierresultaten/leerling/*",
+      "/rest/v1/geldendexamendossierresultaten/leerling/*"
+    ]
+  }
+}

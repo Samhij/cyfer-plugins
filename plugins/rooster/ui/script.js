@@ -16,9 +16,9 @@ const MS_DAY = 24 * 60 * 60 * 1000;
 const DEFAULT_START_MIN = 8 * 60;
 const DEFAULT_END_MIN = 16 * 60;
 /** Pixels per hour on the shared timeline. */
-const PX_PER_HOUR = 56;
+const PX_PER_HOUR = 96;
 /** Minimum visible card height so short slots stay readable. */
-const MIN_CARD_PX = 28;
+const MIN_CARD_PX = 48;
 
 const weekLabelEl = document.getElementById("weekLabel");
 const statusEl = document.getElementById("status");

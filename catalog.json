@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-03T18:11:49Z",
+  "updatedAt": "2026-10-03T18:16:52Z",
   "plugins": [
     {
       "id": "widget-cijfers",
@@ -25,7 +25,7 @@
     {
       "id": "rooster",
       "name": "Rooster",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "description": "Weekrooster (ma–vr) op tijdlijn, overlappingen naast elkaar",
       "author": "Sam Hijmans",
       "kind": "page",

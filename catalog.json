@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-03T18:16:52Z",
+  "updatedAt": "2026-10-03T18:23:29Z",
   "plugins": [
     {
       "id": "widget-cijfers",
@@ -21,6 +21,26 @@
       },
       "downloadUrl": "",
       "sourceUrl": "https://github.com/Samhij/cyfer-plugins/tree/main/plugins/widget-cijfers"
+    },
+    {
+      "id": "vandaag",
+      "name": "Vandaag",
+      "version": "1.0.0",
+      "description": "Lessen van vandaag op Overzicht, met nu-lijn",
+      "author": "Sam Hijmans",
+      "kind": "widget",
+      "nav": {
+        "label": "Vandaag",
+        "icon": "Clock",
+        "order": 5
+      },
+      "permissions": {
+        "api": [
+          "/rest/v1/afspraakitems/*/jaar/*/week/*"
+        ]
+      },
+      "downloadUrl": "",
+      "sourceUrl": "https://github.com/Samhij/cyfer-plugins/tree/main/plugins/vandaag"
     },
     {
       "id": "rooster",

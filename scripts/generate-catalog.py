@@ -21,6 +21,11 @@ def repo_slug() -> str:
 
 
 def ref_name() -> str:
+    # Store sourceUrl always targets the catalog base branch (main), not a PR head.
+    # On pull_request, GITHUB_REF_NAME is the feature branch and would make --check fail.
+    base = os.environ.get("GITHUB_BASE_REF", "").strip()
+    if base:
+        return base
     ref = os.environ.get("GITHUB_REF_NAME", "").strip()
     if ref:
         return ref

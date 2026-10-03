@@ -6,11 +6,13 @@ Fork this repo, add your plugin under `plugins/`, and open a pull request. After
 
 ## Quick start
 
-1. Fork and clone this repository
+1. Fork and clone this repository (ideally next to `somtoday-login`)
 2. Copy `plugins/voorbeeld-info` to `plugins/jouw-plugin`
 3. Edit `manifest.json` (`id` must be unique kebab-case)
 4. Build your UI under `ui/` (plain HTML/CSS/JS)
-5. Open a pull request
+5. Preview in Cyfers: host `npm run dev` → **Plugins → Ontwikkeling → Laden**
+   (see [CONTRIBUTING.md](CONTRIBUTING.md)); no zip required while iterating
+6. Open a pull request
 
 Open the repo in VS Code / Cursor for `cyfers.*` and `Somtoday*` autocomplete
 (repo-root `jsconfig.json` + [`types/`](types/)). Type files stay outside plugin zips.

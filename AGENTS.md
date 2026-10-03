@@ -51,8 +51,10 @@ Constraints enforced by CI and by Cyfers install:
 1. Copy `plugins/voorbeeld-info` → `plugins/<your-id>`
 2. Edit `manifest.json` (unique `id`, `name`, `kind`, `nav`, minimal `permissions.api`)
 3. Build UI under `ui/` (plain HTML/CSS/JS — no bundler required; use JSDoc + `types/`)
-4. Run `python3 scripts/generate-catalog.py`, then smoke-test via Cyfers zip upload
-5. Open a pull request
+4. Preview in Cyfers without zip: keep this repo as a sibling of `somtoday-login`,
+   run host `npm run dev`, then **Plugins → Ontwikkeling → Laden** (see CONTRIBUTING).
+   Or set `CYFERS_PLUGIN_DEV_DIR` to this `plugins/` directory.
+5. Run `python3 scripts/generate-catalog.py`, then open a pull request
 
 When changing SDK / Somtoday shapes, edit `types/api.ts` (and keep `globals.d.ts`
 in sync if you add exports). Ask the host repo to re-run `scripts/sync-plugin-types.js`.

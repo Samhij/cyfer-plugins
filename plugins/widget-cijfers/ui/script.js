@@ -1,5 +1,7 @@
-const gradesTable = document.getElementById("normalGrades");
-const examGradesTable = document.getElementById("examGrades");
+/** @type {HTMLTableElement} */
+const gradesTable = /** @type {HTMLTableElement} */ (document.getElementById("normalGrades"));
+/** @type {HTMLTableElement} */
+const examGradesTable = /** @type {HTMLTableElement} */ (document.getElementById("examGrades"));
 
 const QUERY = [
   "type=Toetskolom",

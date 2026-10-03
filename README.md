@@ -12,6 +12,9 @@ Fork this repo, add your plugin under `plugins/`, and open a pull request. After
 4. Build your UI under `ui/` (plain HTML/CSS/JS)
 5. Open a pull request
 
+Open the repo in VS Code / Cursor for `cyfers.*` and `Somtoday*` autocomplete
+(repo-root `jsconfig.json` + [`types/`](types/)). Type files stay outside plugin zips.
+
 Zip layout Cyfers expects:
 
 ```text

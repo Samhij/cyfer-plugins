@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - "plugins/**"
+      - "types/**"
+      - "jsconfig.json"
+      - "package.json"
       - "catalog.json"
       - "scripts/generate-catalog.py"
       - ".github/workflows/validate.yml"
@@ -11,6 +14,9 @@ on:
     branches: [main]
     paths:
       - "plugins/**"
+      - "types/**"
+      - "jsconfig.json"
+      - "package.json"
       - "catalog.json"
       - "scripts/generate-catalog.py"
       - ".github/workflows/validate.yml"

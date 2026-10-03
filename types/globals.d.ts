@@ -1,0 +1,66 @@
+/**
+ * Ambient globals for plain HTML/JS plugins (JSDoc + IDE autocomplete).
+ * Included via the repo-root jsconfig.json — do not ship inside plugin zips.
+ */
+
+import type {
+  CyfersContext as _CyfersContext,
+  CyfersSdk as _CyfersSdk,
+  CyfersStudent as _CyfersStudent,
+  PluginKind as _PluginKind,
+  PluginManifest as _PluginManifest,
+  PluginNav as _PluginNav,
+  SomtodayAbsentieMelding as _SomtodayAbsentieMelding,
+  SomtodayAbsentieReden as _SomtodayAbsentieReden,
+  SomtodayAccount as _SomtodayAccount,
+  SomtodayAfspraak as _SomtodayAfspraak,
+  SomtodayAfspraakType as _SomtodayAfspraakType,
+  SomtodayBoodschap as _SomtodayBoodschap,
+  SomtodayBoodschapConversatie as _SomtodayBoodschapConversatie,
+  SomtodayBoodschapCorrespondent as _SomtodayBoodschapCorrespondent,
+  SomtodayEntity as _SomtodayEntity,
+  SomtodayGrade as _SomtodayGrade,
+  SomtodayLesgroep as _SomtodayLesgroep,
+  SomtodayLink as _SomtodayLink,
+  SomtodayListResponse as _SomtodayListResponse,
+  SomtodayPermission as _SomtodayPermission,
+  SomtodaySchooljaar as _SomtodaySchooljaar,
+  SomtodayStudent as _SomtodayStudent,
+  SomtodayStudiewijzer as _SomtodayStudiewijzer,
+  SomtodayStudiewijzerItem as _SomtodayStudiewijzerItem,
+  SomtodayStudiewijzerItemAfspraakToekenning as _SomtodayStudiewijzerItemAfspraakToekenning,
+  SomtodayVak as _SomtodayVak,
+} from "./api";
+
+declare global {
+  type CyfersStudent = _CyfersStudent;
+  type CyfersContext = _CyfersContext;
+  type PluginKind = _PluginKind;
+  type PluginNav = _PluginNav;
+  type PluginManifest = _PluginManifest;
+  type SomtodayLink = _SomtodayLink;
+  type SomtodayPermission = _SomtodayPermission;
+  type SomtodayEntity = _SomtodayEntity;
+  type SomtodayStudent = _SomtodayStudent;
+  type SomtodaySchooljaar = _SomtodaySchooljaar;
+  type SomtodayGrade = _SomtodayGrade;
+  type SomtodayVak = _SomtodayVak;
+  type SomtodayAfspraakType = _SomtodayAfspraakType;
+  type SomtodayAfspraak = _SomtodayAfspraak;
+  type SomtodayAbsentieReden = _SomtodayAbsentieReden;
+  type SomtodayAbsentieMelding = _SomtodayAbsentieMelding;
+  type SomtodayLesgroep = _SomtodayLesgroep;
+  type SomtodayStudiewijzer = _SomtodayStudiewijzer;
+  type SomtodayStudiewijzerItem = _SomtodayStudiewijzerItem;
+  type SomtodayStudiewijzerItemAfspraakToekenning = _SomtodayStudiewijzerItemAfspraakToekenning;
+  type SomtodayAccount = _SomtodayAccount;
+  type SomtodayBoodschapCorrespondent = _SomtodayBoodschapCorrespondent;
+  type SomtodayBoodschap = _SomtodayBoodschap;
+  type SomtodayBoodschapConversatie = _SomtodayBoodschapConversatie;
+  type SomtodayListResponse<T> = _SomtodayListResponse<T>;
+
+  /** Injected by the Cyfers host — do not ship your own SDK script. */
+  const cyfers: _CyfersSdk;
+}
+
+export {};

@@ -11,25 +11,29 @@ access goes through a host proxy and a per-plugin path allowlist.
 | Path in `somtoday-login` | Why it matters |
 | --- | --- |
 | `docs/plugins.md` | Full Dutch author guide (source of truth for authors) |
-| `lib/plugins/manifest.ts` | Manifest schema + validation |
+| `lib/plugins/manifest.ts` | Manifest validation (types imported from vendored copy of `types/`) |
 | `lib/plugins/sdk.ts` | Injected `window.cyfers` bridge |
 | `lib/plugins/match.ts` | `/rest/` glob allowlist matching (`*` = one path segment) |
 | `lib/plugins/base-styles.ts` | Injected CSS tokens / helpers |
 | `lib/plugins/store.ts` | How Cyfers loads `catalog.json` from this repo |
-| `plugins/cyfers.d.ts` | Ambient TypeScript types for the SDK |
+| `vendor/cyfer-plugin-types/` | Vendored copy of this repo’s `types/` (keep in sync) |
 | `plugins/voorbeeld-info` | Local page sample (mirrors this repo) |
-| `plugins/cyfers.d.ts` | Ambient TypeScript types for the SDK |
 
 Prefer reading those files over inventing APIs.
 
 ## Repository layout
 
 ```text
+types/
+  api.ts                 # exported plugin-facing types (source of truth)
+  globals.d.ts           # ambient `cyfers` + Somtoday* for IDE / JSDoc
 plugins/<id>/
   manifest.json          # required
   ui/
     index.html           # usual entry
     *.css / *.js / …     # optional assets
+jsconfig.json            # includes plugins/** + types/** for autocomplete
+package.json             # `@cyfers/plugin-types` (types-only, private)
 catalog.json             # store listing consumed by Cyfers
 .github/workflows/validate.yml
 ```
@@ -46,9 +50,12 @@ Constraints enforced by CI and by Cyfers install:
 
 1. Copy `plugins/voorbeeld-info` → `plugins/<your-id>`
 2. Edit `manifest.json` (unique `id`, `name`, `kind`, `nav`, minimal `permissions.api`)
-3. Build UI under `ui/` (plain HTML/CSS/JS — no bundler required)
+3. Build UI under `ui/` (plain HTML/CSS/JS — no bundler required; use JSDoc + `types/`)
 4. Run `python3 scripts/generate-catalog.py`, then smoke-test via Cyfers zip upload
 5. Open a pull request
+
+When changing SDK / Somtoday shapes, edit `types/api.ts` (and keep `globals.d.ts`
+in sync if you add exports). Ask the host repo to re-run `scripts/sync-plugin-types.js`.
 
 Zip layout Cyfers expects:
 
@@ -61,7 +68,8 @@ mijn-plugin/
 
 ## manifest.json
 
-Required shape (see `somtoday-login/lib/plugins/manifest.ts`):
+Required shape (see `types/api.ts` → `PluginManifest`; host validates in
+`somtoday-login/lib/plugins/manifest.ts`):
 
 | Field | Notes |
 | --- | --- |

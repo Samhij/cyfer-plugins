@@ -1,11 +1,28 @@
 /** @typedef {{ year: number, week: number }} IsoWeek */
 
+/**
+ * @typedef {{
+ *   item: SomtodayAfspraakItem,
+ *   startMin: number,
+ *   endMin: number,
+ *   column: number,
+ *   columnCount: number,
+ * }} LaidOutLesson
+ */
+
 const DAY_NAMES = ["Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag"];
 const MS_DAY = 24 * 60 * 60 * 1000;
+/** Fallback day window when the week has no timed lessons (minutes from midnight). */
+const DEFAULT_START_MIN = 8 * 60;
+const DEFAULT_END_MIN = 16 * 60;
+/** Pixels per hour on the shared timeline. */
+const PX_PER_HOUR = 56;
+/** Minimum visible card height so short slots stay readable. */
+const MIN_CARD_PX = 28;
 
 const weekLabelEl = document.getElementById("weekLabel");
 const statusEl = document.getElementById("status");
-const daysEl = document.getElementById("days");
+const scheduleEl = document.getElementById("schedule");
 const prevBtn = /** @type {HTMLButtonElement} */ (document.getElementById("prevWeek"));
 const nextBtn = /** @type {HTMLButtonElement} */ (document.getElementById("nextWeek"));
 const thisBtn = /** @type {HTMLButtonElement} */ (document.getElementById("thisWeek"));
@@ -92,8 +109,20 @@ function parseLocalDateTime(raw) {
 }
 
 /** @param {Date} date */
+function minutesFromMidnight(date) {
+  return date.getHours() * 60 + date.getMinutes() + date.getSeconds() / 60;
+}
+
+/** @param {Date} date */
 function formatTime(date) {
   return date.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
+}
+
+/** @param {number} minutes */
+function formatHourLabel(minutes) {
+  const h = Math.floor(minutes / 60);
+  const m = Math.round(minutes % 60);
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
 /** @param {Date} date */
@@ -173,33 +202,232 @@ function updateWeekChrome() {
 }
 
 /**
+ * Classic calendar overlap packing: assign leftmost free column, then split
+ * width evenly across the max column count in each overlapping cluster.
+ * @param {SomtodayAfspraakItem[]} items
+ * @returns {LaidOutLesson[]}
+ */
+function layoutOverlappingLessons(items) {
+  /** @type {LaidOutLesson[]} */
+  const events = [];
+
+  for (const item of items) {
+    const start = parseLocalDateTime(item.beginDatumTijd);
+    const end = parseLocalDateTime(item.eindDatumTijd);
+    if (!start) continue;
+    let startMin = minutesFromMidnight(start);
+    let endMin = end ? minutesFromMidnight(end) : startMin + 45;
+    if (endMin <= startMin) endMin = startMin + 15;
+    events.push({
+      item,
+      startMin,
+      endMin,
+      column: 0,
+      columnCount: 1,
+    });
+  }
+
+  events.sort((a, b) => {
+    if (a.startMin !== b.startMin) return a.startMin - b.startMin;
+    return b.endMin - a.endMin;
+  });
+
+  /** @type {number[]} end minute of the last event placed in each column */
+  const columnEnds = [];
+
+  for (const ev of events) {
+    let col = -1;
+    for (let c = 0; c < columnEnds.length; c += 1) {
+      if (columnEnds[c] <= ev.startMin) {
+        col = c;
+        break;
+      }
+    }
+    if (col === -1) {
+      col = columnEnds.length;
+      columnEnds.push(ev.endMin);
+    } else {
+      columnEnds[col] = ev.endMin;
+    }
+    ev.column = col;
+  }
+
+  // Cluster by transitive overlap so concurrent groups share one columnCount.
+  /** @type {LaidOutLesson[][]} */
+  const clusters = [];
+  /** @type {LaidOutLesson[]} */
+  let active = [];
+
+  for (const ev of events) {
+    active = active.filter((other) => other.endMin > ev.startMin);
+    if (active.length === 0) {
+      clusters.push([ev]);
+    } else {
+      clusters[clusters.length - 1].push(ev);
+    }
+    active.push(ev);
+  }
+
+  for (const cluster of clusters) {
+    const columnCount = Math.max(...cluster.map((e) => e.column)) + 1;
+    for (const ev of cluster) {
+      ev.columnCount = columnCount;
+    }
+  }
+
+  return events;
+}
+
+/**
+ * Snap timeline bounds to whole hours around the week's lessons.
+ * @param {LaidOutLesson[][]} byDay
+ */
+function timelineBounds(byDay) {
+  let minStart = Infinity;
+  let maxEnd = -Infinity;
+  for (const day of byDay) {
+    for (const ev of day) {
+      if (ev.startMin < minStart) minStart = ev.startMin;
+      if (ev.endMin > maxEnd) maxEnd = ev.endMin;
+    }
+  }
+  if (!Number.isFinite(minStart) || !Number.isFinite(maxEnd)) {
+    return { startMin: DEFAULT_START_MIN, endMin: DEFAULT_END_MIN };
+  }
+  const startMin = Math.max(0, Math.floor(minStart / 60) * 60);
+  let endMin = Math.min(24 * 60, Math.ceil(maxEnd / 60) * 60);
+  if (endMin <= startMin) endMin = startMin + 60;
+  return { startMin, endMin };
+}
+
+/**
+ * @param {number} startMin
+ * @param {number} endMin
+ */
+function renderHoursAxis(startMin, endMin) {
+  const axis = document.createElement("div");
+  axis.className = "hours-axis";
+  axis.setAttribute("aria-hidden", "true");
+
+  for (let t = startMin; t <= endMin; t += 60) {
+    const label = document.createElement("div");
+    label.className = "hour-label";
+    label.style.top = `${((t - startMin) / 60) * PX_PER_HOUR}px`;
+    label.textContent = formatHourLabel(t);
+    axis.appendChild(label);
+  }
+
+  return axis;
+}
+
+/**
+ * @param {HTMLElement} track
+ * @param {number} startMin
+ * @param {number} endMin
+ */
+function appendHourLines(track, startMin, endMin) {
+  for (let t = startMin; t <= endMin; t += 60) {
+    const line = document.createElement("div");
+    line.className = "hour-line";
+    line.style.top = `${((t - startMin) / 60) * PX_PER_HOUR}px`;
+    track.appendChild(line);
+  }
+}
+
+/**
+ * @param {LaidOutLesson} laid
+ * @param {number} dayStartMin
+ */
+function renderLesson(laid, dayStartMin) {
+  const { item, startMin, endMin, column, columnCount } = laid;
+  const li = document.createElement("li");
+  li.className = "lesson";
+
+  const top = ((startMin - dayStartMin) / 60) * PX_PER_HOUR;
+  const rawHeight = ((endMin - startMin) / 60) * PX_PER_HOUR;
+  const height = Math.max(rawHeight, MIN_CARD_PX);
+  const widthPct = 100 / columnCount;
+  const leftPct = column * widthPct;
+
+  li.style.top = `${top}px`;
+  li.style.height = `${height}px`;
+  li.style.left = `calc(${leftPct}% + 2px)`;
+  li.style.width = `calc(${widthPct}% - 4px)`;
+
+  const start = parseLocalDateTime(item.beginDatumTijd);
+  const end = parseLocalDateTime(item.eindDatumTijd);
+  const time =
+    start && end
+      ? `${formatTime(start)}–${formatTime(end)}`
+      : start
+        ? formatTime(start)
+        : "—";
+  const period = periodOf(item);
+  const teacher = teacherOf(item);
+  const location = (item.locatie || "").trim();
+  const group = groupOf(item);
+  const metaParts = [teacher, location, group].filter(Boolean);
+
+  li.innerHTML = `
+    <div class="lesson-time">
+      <span>${escapeHtml(time)}</span>
+      ${period ? `<span class="lesson-period">${escapeHtml(period)}</span>` : ""}
+    </div>
+    <p class="lesson-subject">${escapeHtml(subjectOf(item))}</p>
+    ${metaParts.length ? `<p class="lesson-meta">${escapeHtml(metaParts.join(" · "))}</p>` : ""}
+  `;
+  return li;
+}
+
+/**
  * @param {SomtodayAfspraakItem[]} items
  */
-function renderDays(items) {
+function renderSchedule(items) {
   const monday = mondayOfIsoWeek(currentWeek.year, currentWeek.week);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
   /** @type {SomtodayAfspraakItem[][]} */
-  const byDay = [[], [], [], [], []];
+  const rawByDay = [[], [], [], [], []];
 
   for (const item of items) {
     const start = parseLocalDateTime(item.beginDatumTijd);
     if (!start) continue;
     const weekday = (start.getDay() + 6) % 7; // Mon=0 … Sun=6
-    if (weekday > 4) continue; // skip weekend
-    byDay[weekday].push(item);
+    if (weekday > 4) continue;
+    rawByDay[weekday].push(item);
   }
 
-  for (const dayItems of byDay) {
-    dayItems.sort((a, b) => {
-      const ta = parseLocalDateTime(a.beginDatumTijd)?.getTime() ?? 0;
-      const tb = parseLocalDateTime(b.beginDatumTijd)?.getTime() ?? 0;
-      return ta - tb;
-    });
-  }
+  /** @type {LaidOutLesson[][]} */
+  const byDay = rawByDay.map((dayItems) => layoutOverlappingLessons(dayItems));
+  const { startMin, endMin } = timelineBounds(byDay);
+  const trackHeight = ((endMin - startMin) / 60) * PX_PER_HOUR;
 
-  daysEl.replaceChildren();
+  scheduleEl.replaceChildren();
+  scheduleEl.style.setProperty("--track-height", `${trackHeight}px`);
+
+  const scroll = document.createElement("div");
+  scroll.className = "schedule-scroll";
+
+  const body = document.createElement("div");
+  body.className = "schedule-body";
+
+  const gutter = document.createElement("div");
+  gutter.className = "hours-gutter";
+  const gutterHead = document.createElement("div");
+  gutterHead.className = "hours-gutter-head";
+  gutter.appendChild(gutterHead);
+  const axisWrap = document.createElement("div");
+  axisWrap.className = "hours-axis-wrap";
+  axisWrap.style.height = `${trackHeight}px`;
+  axisWrap.appendChild(renderHoursAxis(startMin, endMin));
+  gutter.appendChild(axisWrap);
+  body.appendChild(gutter);
+
+  const daysEl = document.createElement("div");
+  daysEl.className = "days";
+  daysEl.id = "days";
+
   let total = 0;
 
   for (let i = 0; i < 5; i += 1) {
@@ -217,22 +445,32 @@ function renderDays(items) {
     heading.innerHTML = `<h2>${escapeHtml(DAY_NAMES[i])}</h2><span class="date">${escapeHtml(formatShortDate(dayDate))}</span>`;
     section.appendChild(heading);
 
+    const track = document.createElement("div");
+    track.className = "day-track";
+    track.style.height = `${trackHeight}px`;
+    appendHourLines(track, startMin, endMin);
+
     if (dayItems.length === 0) {
       const empty = document.createElement("p");
       empty.className = "empty day-empty";
       empty.textContent = "Geen lessen";
-      section.appendChild(empty);
+      track.appendChild(empty);
     } else {
       const list = document.createElement("ul");
       list.className = "lessons";
-      for (const item of dayItems) {
-        list.appendChild(renderLesson(item));
+      for (const laid of dayItems) {
+        list.appendChild(renderLesson(laid, startMin));
       }
-      section.appendChild(list);
+      track.appendChild(list);
     }
 
+    section.appendChild(track);
     daysEl.appendChild(section);
   }
+
+  body.appendChild(daysEl);
+  scroll.appendChild(body);
+  scheduleEl.appendChild(scroll);
 
   if (total === 0) {
     setStatus("empty", "Geen lessen deze week.");
@@ -241,45 +479,12 @@ function renderDays(items) {
   }
 }
 
-/**
- * @param {SomtodayAfspraakItem} item
- */
-function renderLesson(item) {
-  const li = document.createElement("li");
-  li.className = "lesson";
-
-  const start = parseLocalDateTime(item.beginDatumTijd);
-  const end = parseLocalDateTime(item.eindDatumTijd);
-  const time =
-    start && end
-      ? `${formatTime(start)}–${formatTime(end)}`
-      : start
-        ? formatTime(start)
-        : "—";
-  const period = periodOf(item);
-  const teacher = teacherOf(item);
-  const location = (item.locatie || "").trim();
-  const group = groupOf(item);
-
-  const metaParts = [teacher, location, group].filter(Boolean);
-
-  li.innerHTML = `
-    <div class="lesson-time">
-      <span>${escapeHtml(time)}</span>
-      ${period ? `<span class="lesson-period">${escapeHtml(period)}</span>` : ""}
-    </div>
-    <p class="lesson-subject">${escapeHtml(subjectOf(item))}</p>
-    ${metaParts.length ? `<p class="lesson-meta">${escapeHtml(metaParts.join(" · "))}</p>` : ""}
-  `;
-  return li;
-}
-
 async function loadWeek() {
   const seq = ++loadSeq;
   updateWeekChrome();
   setNavEnabled(false);
   setStatus("muted", "Laden…");
-  daysEl.replaceChildren();
+  scheduleEl.replaceChildren();
 
   if (!studentId) {
     setStatus("error", "Geen leerling gevonden in de sessie.");
@@ -294,12 +499,12 @@ async function loadWeek() {
     /** @type {SomtodayListResponse<SomtodayAfspraakItem>} */
     const data = await cyfers.fetch(path);
     if (seq !== loadSeq) return;
-    renderDays(data?.items ?? []);
+    renderSchedule(data?.items ?? []);
   } catch (error) {
     if (seq !== loadSeq) return;
     const message = error instanceof Error ? error.message : "Laden mislukt.";
     setStatus("error", message);
-    daysEl.replaceChildren();
+    scheduleEl.replaceChildren();
   } finally {
     if (seq === loadSeq) setNavEnabled(true);
   }

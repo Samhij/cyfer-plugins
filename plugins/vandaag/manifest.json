@@ -1,0 +1,19 @@
+{
+  "id": "vandaag",
+  "name": "Vandaag",
+  "version": "1.0.0",
+  "description": "Lessen van vandaag op Overzicht, met nu-lijn",
+  "author": "Sam Hijmans",
+  "kind": "widget",
+  "entry": "ui/index.html",
+  "nav": {
+    "label": "Vandaag",
+    "icon": "Clock",
+    "order": 5
+  },
+  "permissions": {
+    "api": [
+      "/rest/v1/afspraakitems/*/jaar/*/week/*"
+    ]
+  }
+}

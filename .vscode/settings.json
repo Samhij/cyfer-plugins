@@ -1,0 +1,4 @@
+{
+  "css.customData": ["./styles/css-custom-data.json"],
+  "html.customData": ["./styles/html-custom-data.json"]
+}

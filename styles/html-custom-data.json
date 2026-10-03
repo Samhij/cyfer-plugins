@@ -1,0 +1,39 @@
+{
+  "version": 1.1,
+  "globalAttributes": [
+    {
+      "name": "class",
+      "description": "Cyfers host injects helper classes from styles/plugin-base.css. Prefer these over reinventing muted/error chrome.",
+      "values": [
+        {
+          "name": "lede",
+          "description": "Short intro / supporting sentence (muted, max-width)."
+        },
+        {
+          "name": "muted",
+          "description": "Secondary text."
+        },
+        {
+          "name": "empty",
+          "description": "Empty-state copy (same look as .muted)."
+        },
+        {
+          "name": "error",
+          "description": "Error banner (danger text + danger background)."
+        },
+        {
+          "name": "cyfers-widget",
+          "description": "Applied by the host on widget bodies for compact padding — do not set manually on pages."
+        },
+        {
+          "name": "primary",
+          "description": "On <button>: filled accent CTA."
+        },
+        {
+          "name": "ghost",
+          "description": "On <button>: text-style control with underline border."
+        }
+      ]
+    }
+  ]
+}

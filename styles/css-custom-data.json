@@ -1,0 +1,138 @@
+{
+  "version": 1.1,
+  "properties": [
+    {
+      "name": "--bg",
+      "description": "Plugin page background (usually transparent so the host chrome shows through).",
+      "references": [
+        {
+          "name": "plugin-base.css",
+          "url": "https://github.com/Samhij/cyfer-plugins/blob/main/styles/plugin-base.css"
+        }
+      ]
+    },
+    {
+      "name": "--bg-elevated",
+      "description": "Elevated surface (table headers, buttons, zebra rows).",
+      "references": [
+        {
+          "name": "plugin-base.css",
+          "url": "https://github.com/Samhij/cyfer-plugins/blob/main/styles/plugin-base.css"
+        }
+      ]
+    },
+    {
+      "name": "--ink",
+      "description": "Primary text / heading color.",
+      "references": [
+        {
+          "name": "plugin-base.css",
+          "url": "https://github.com/Samhij/cyfer-plugins/blob/main/styles/plugin-base.css"
+        }
+      ]
+    },
+    {
+      "name": "--muted",
+      "description": "Secondary text (lede, empty states, table headers).",
+      "references": [
+        {
+          "name": "plugin-base.css",
+          "url": "https://github.com/Samhij/cyfer-plugins/blob/main/styles/plugin-base.css"
+        }
+      ]
+    },
+    {
+      "name": "--line",
+      "description": "Borders and dividers.",
+      "references": [
+        {
+          "name": "plugin-base.css",
+          "url": "https://github.com/Samhij/cyfer-plugins/blob/main/styles/plugin-base.css"
+        }
+      ]
+    },
+    {
+      "name": "--accent",
+      "description": "Brand accent (links, primary buttons, focus).",
+      "references": [
+        {
+          "name": "plugin-base.css",
+          "url": "https://github.com/Samhij/cyfer-plugins/blob/main/styles/plugin-base.css"
+        }
+      ]
+    },
+    {
+      "name": "--accent-soft",
+      "description": "Soft accent wash (row hover, chips).",
+      "references": [
+        {
+          "name": "plugin-base.css",
+          "url": "https://github.com/Samhij/cyfer-plugins/blob/main/styles/plugin-base.css"
+        }
+      ]
+    },
+    {
+      "name": "--accent-ink",
+      "description": "Text on accent-filled controls (e.g. button.primary).",
+      "references": [
+        {
+          "name": "plugin-base.css",
+          "url": "https://github.com/Samhij/cyfer-plugins/blob/main/styles/plugin-base.css"
+        }
+      ]
+    },
+    {
+      "name": "--danger",
+      "description": "Error / danger text color.",
+      "references": [
+        {
+          "name": "plugin-base.css",
+          "url": "https://github.com/Samhij/cyfer-plugins/blob/main/styles/plugin-base.css"
+        }
+      ]
+    },
+    {
+      "name": "--danger-bg",
+      "description": "Error / danger background (see .error).",
+      "references": [
+        {
+          "name": "plugin-base.css",
+          "url": "https://github.com/Samhij/cyfer-plugins/blob/main/styles/plugin-base.css"
+        }
+      ]
+    },
+    {
+      "name": "--focus",
+      "description": "Focus ring tint (accent-based).",
+      "references": [
+        {
+          "name": "plugin-base.css",
+          "url": "https://github.com/Samhij/cyfer-plugins/blob/main/styles/plugin-base.css"
+        }
+      ]
+    },
+    {
+      "name": "--font-body",
+      "description": "Body font stack (IBM Plex Sans; host also injects the webfont).",
+      "references": [
+        {
+          "name": "plugin-base.css",
+          "url": "https://github.com/Samhij/cyfer-plugins/blob/main/styles/plugin-base.css"
+        }
+      ]
+    },
+    {
+      "name": "--font-display",
+      "description": "Display / heading font stack (Syne; host also injects the webfont).",
+      "references": [
+        {
+          "name": "plugin-base.css",
+          "url": "https://github.com/Samhij/cyfer-plugins/blob/main/styles/plugin-base.css"
+        }
+      ]
+    }
+  ],
+  "atDirectives": [],
+  "pseudoClasses": [],
+  "pseudoElements": []
+}

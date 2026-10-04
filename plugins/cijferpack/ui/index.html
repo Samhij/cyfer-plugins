@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1" name="viewport" />
+  <title>Cijferpack</title>
+  <link href="style.css" rel="stylesheet" />
+</head>
+<body>
+  <div id="status" class="status-banner muted" hidden></div>
+
+  <!-- Full-bleed theater: intro / reveal / board share one stage -->
+  <div id="theater" class="theater phase-intro" data-phase="intro">
+    <div class="stage-floor" aria-hidden="true"></div>
+    <div class="vignette" aria-hidden="true"></div>
+    <div class="spot spot-l" aria-hidden="true"></div>
+    <div class="spot spot-r" aria-hidden="true"></div>
+    <div class="spot spot-c" aria-hidden="true"></div>
+    <div class="beams" id="beams" aria-hidden="true"></div>
+    <canvas id="fxCanvas" class="fx-canvas" aria-hidden="true"></canvas>
+    <div class="screen-shake" id="screenShake">
+      <div class="flashbang" id="flash" aria-hidden="true"></div>
+      <div class="chromatic" id="chromatic" aria-hidden="true"></div>
+
+      <header class="chrome chrome-top">
+        <div class="chrome-brand">
+          <span class="chrome-mark">CYFERS</span>
+          <h1>Cijferpack</h1>
+        </div>
+        <p class="chrome-sub muted" id="subtitle">Laden…</p>
+      </header>
+
+      <!-- INTRO: closed pack on the arena -->
+      <section id="intro" class="phase phase-intro-panel" aria-live="polite">
+        <div class="arena" id="arena">
+          <div class="pack-idle-ring" aria-hidden="true"></div>
+          <button type="button" class="pack" id="pack" disabled aria-label="Open cijferpakket">
+            <span class="pack-glow" aria-hidden="true"></span>
+            <span class="pack-mesh" aria-hidden="true">
+              <span class="pack-foil"></span>
+              <span class="pack-ridge"></span>
+              <span class="pack-seal">
+                <span class="seal-ring"></span>
+                <span class="seal-core">C</span>
+              </span>
+              <span class="pack-stripe"></span>
+            </span>
+            <span class="pack-face">
+              <span class="pack-badge">PREMIUM</span>
+              <strong class="pack-title">Cijferpakket</strong>
+              <span class="pack-count" id="packCount">— kaarten</span>
+            </span>
+          </button>
+        </div>
+        <div class="intro-hud">
+          <p class="intro-tagline" id="introTagline">Klaar om te openen</p>
+          <button type="button" id="openBtn" class="primary open-cta" disabled>
+            Open pakket
+          </button>
+        </div>
+      </section>
+
+      <!-- REVEAL: one hero card at a time -->
+      <section id="reveal" class="phase phase-reveal-panel" hidden aria-live="polite">
+        <div class="walkout-wash" id="walkoutWash" aria-hidden="true"></div>
+        <div class="reveal-hero" id="revealHero">
+          <div id="revealCardHost" class="reveal-card-host"></div>
+        </div>
+        <div class="reveal-hud">
+          <p class="reveal-tier-call" id="tierCall" hidden></p>
+          <p class="reveal-progress" id="revealProgress"></p>
+          <button type="button" id="continueBtn" class="primary continue-cta" hidden>
+            Tik om door te gaan
+          </button>
+          <button type="button" id="skipBtn" class="ghost skip-cta">Alles tonen</button>
+        </div>
+      </section>
+
+      <!-- END BOARD: full pull -->
+      <section id="gallery" class="phase phase-gallery-panel" hidden>
+        <div class="board-header">
+          <h2>Jouw trekking</h2>
+          <p class="muted" id="galleryMeta"></p>
+        </div>
+        <div id="galleryGrid" class="gallery-grid"></div>
+        <div class="board-actions">
+          <button type="button" id="replayBtn" class="primary open-cta">Opnieuw openen</button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

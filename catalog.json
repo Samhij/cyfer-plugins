@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-03T18:23:29Z",
+  "updatedAt": "2026-10-04T00:06:32Z",
   "plugins": [
     {
       "id": "widget-cijfers",
@@ -61,6 +61,27 @@
       },
       "downloadUrl": "",
       "sourceUrl": "https://github.com/Samhij/cyfer-plugins/tree/main/plugins/rooster"
+    },
+    {
+      "id": "cijferpack",
+      "name": "Cijferpack",
+      "version": "1.1.1",
+      "description": "Open je cijfers als een full-stage pack reveal (FIFA-stijl pacing)",
+      "author": "Sam Hijmans",
+      "kind": "page",
+      "nav": {
+        "label": "Cijferpack",
+        "icon": "Package",
+        "order": 15
+      },
+      "permissions": {
+        "api": [
+          "/rest/v1/geldendvoortgangsdossierresultaten/leerling/*",
+          "/rest/v1/geldendexamendossierresultaten/leerling/*"
+        ]
+      },
+      "downloadUrl": "",
+      "sourceUrl": "https://github.com/Samhij/cyfer-plugins/tree/main/plugins/cijferpack"
     }
   ]
 }

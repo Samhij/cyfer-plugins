@@ -51,7 +51,6 @@
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   /** Global animation time multiplier. */
   const SPEED = reducedMotion ? 0.35 : 1;
-  const MAX_HIGHLIGHTS = 3;
   /** Hype level (see hypeOf) from which a card gets a full walkout. */
   const WALKOUT_HYPE = 4;
 
@@ -1712,11 +1711,33 @@
   let run = null;
   let runSeq = 0;
 
-  /** Highlights revealed one by one: up to 3 gold+ cards, ascending so the biggest pull comes last. */
-  function highlightsOf(cards) {
-    const sorted = cards.slice().sort(byOvrDesc);
-    const gold = sorted.filter((c) => c.ovr >= 70).slice(0, MAX_HIGHLIGHTS);
-    return (gold.length ? gold : sorted.slice(0, 1)).reverse();
+  /** Every pack card, ascending by rating so the biggest pull comes last. */
+  function revealQueue(cards) {
+    return cards.slice().sort(byOvrDesc).reverse();
+  }
+
+  /**
+   * Animate the rating number from 1,0 up to the real grade (cancellable via Phase).
+   * @param {Phase} p
+   * @param {HTMLElement} ratingEl
+   * @param {GradeCard} card
+   * @param {number} [scale=1]
+   */
+  async function tickUpRating(p, ratingEl, card, scale = 1) {
+    if (card.grade == null) return;
+    let lastTick = 0;
+    const target = card.grade;
+    await p.tween(1000 * scale, (t) => {
+      const eased = 1 - Math.pow(1 - t, 3);
+      ratingEl.textContent = formatGrade(1 + (target - 1) * eased);
+      const now = performance.now();
+      if (t < 1 && now - lastTick > 70) {
+        lastTick = now;
+        audio.tick();
+      }
+    });
+    ratingEl.textContent = card.display;
+    ratingEl.classList.toggle("is-long", card.display.length > 3);
   }
 
   function setHint(text) {
@@ -1906,7 +1927,7 @@
   async function highlights(r) {
     const p = r.phase;
     r.step = "reveal";
-    const list = highlightsOf(r.cards);
+    const list = revealQueue(r.cards);
     for (let i = 0; i < list.length; i += 1) {
       const card = list[i];
       els.stageProgress.textContent = list.length > 1 ? `${i + 1} / ${list.length}` : "";
@@ -2030,21 +2051,7 @@
     const cb = c.getBoundingClientRect();
     fx.burst({ x: cb.left + cb.width / 2, y: cb.top + cb.height / 2, count: 160 + hype * 40, colors: tier.particles, speed: 13 + hype, gravity: 0.1, life: 1500, size: 2.8 });
 
-    if (isNumeric && card.grade != null) {
-      let lastTick = 0;
-      const target = card.grade;
-      await p.tween(1000 * slow, (t) => {
-        const eased = 1 - Math.pow(1 - t, 3);
-        ratingEl.textContent = formatGrade(1 + (target - 1) * eased);
-        const now = performance.now();
-        if (t < 1 && now - lastTick > 70) {
-          lastTick = now;
-          audio.tick();
-        }
-      });
-      ratingEl.textContent = card.display;
-      ratingEl.classList.toggle("is-long", card.display.length > 3);
-    }
+    await tickUpRating(p, ratingEl, card, slow);
     audio.chime(tier.rank);
 
     const callout = q(".wo-callout");
@@ -2075,6 +2082,7 @@
   async function quickReveal(p, card, r) {
     const hype = hypeOf(card);
     const tier = TIERS[card.tier];
+    const isNumeric = card.grade != null;
 
     const view = document.createElement("div");
     view.className = "reveal";
@@ -2089,9 +2097,10 @@
       </div>`;
     els.stageContent.replaceChildren(view);
     const slot = /** @type {HTMLElement} */ (view.querySelector(".wo-slot"));
-    const c = cardEl(card, { size: "xl", faceDown: true, isNew: r.newKeys.has(card.key) });
+    const c = cardEl(card, { size: "xl", faceDown: true, isNew: r.newKeys.has(card.key), rating: isNumeric ? "1,0" : card.display });
     slot.appendChild(c);
     const inner = /** @type {HTMLElement} */ (c.querySelector(".fc-inner"));
+    const ratingEl = /** @type {HTMLElement} */ (c.querySelector(".fc-rating"));
 
     audio.whoosh();
     await p.animate(c, [
@@ -2106,9 +2115,10 @@
     await p.wait(300);
     const cb = c.getBoundingClientRect();
     fx.burst({ x: cb.left + cb.width / 2, y: cb.top + cb.height / 2, count: 40 + hype * 30, colors: tier.particles, speed: 6 + hype * 2, gravity: 0.1, life: 1000 });
-    audio.chime(tier.rank);
     quiet(p.animate(view.querySelector(".wo-halo"), [{ opacity: 0 }, { opacity: 0.4 + hype * 0.15 }], { duration: 450 }));
     await flip;
+    await tickUpRating(p, ratingEl, card, 0.75);
+    audio.chime(tier.rank);
     await p.animate(/** @type {HTMLElement} */ (view.querySelector(".wo-banner")), [{ opacity: 0, transform: "translateY(16px)" }, { opacity: 1, transform: "none" }], { duration: 380 });
     return view;
   }
@@ -2119,7 +2129,7 @@
     r.committed = true;
     for (const c of r.cards) state.seen.add(c.key);
     state.stats.packs += 1;
-    state.stats.walkouts += highlightsOf(r.cards).filter((c) => hypeOf(c) >= WALKOUT_HYPE).length;
+    state.stats.walkouts += r.cards.filter((c) => hypeOf(c) >= WALKOUT_HYPE).length;
     const best = r.best;
     if (!state.stats.best || best.ovr > state.stats.best.ovr) {
       state.stats.best = { subject: best.subject, display: best.display, ovr: best.ovr, tier: best.tier };

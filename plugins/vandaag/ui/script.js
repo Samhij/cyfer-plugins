@@ -38,6 +38,9 @@ let nowLineEl = null;
 let lessonsListEl = null;
 /** @type {number | null} */
 let nowTimer = null;
+/** Last auto-scroll focus key — skip re-centering until the active slot changes. */
+/** @type {string | null} */
+let lastFocusKey = null;
 let loadSeq = 0;
 
 function escapeHtml(value) {
@@ -357,6 +360,7 @@ function renderLesson(laid, dayStartMin) {
   li.className = cancelled ? "lesson lesson-future lesson-cancelled" : "lesson lesson-future";
   li.dataset.start = String(startMin);
   li.dataset.end = String(endMin);
+  li.dataset.column = String(column);
   if (cancelled) {
     li.dataset.cancelled = "1";
     li.setAttribute("aria-label", `${subjectOf(item)} — ${cancellationLabel(item)}`);
@@ -401,6 +405,101 @@ function renderLesson(laid, dayStartMin) {
   return li;
 }
 
+/**
+ * @param {LaidOutLesson} laid
+ * @returns {HTMLElement | null}
+ */
+function lessonElement(laid) {
+  if (!lessonsListEl) return null;
+  for (const li of lessonsListEl.querySelectorAll(".lesson")) {
+    const el = /** @type {HTMLElement} */ (li);
+    if (
+      Number(el.dataset.start) === laid.startMin &&
+      Number(el.dataset.end) === laid.endMin &&
+      Number(el.dataset.column) === laid.column
+    ) {
+      return el;
+    }
+  }
+  return null;
+}
+
+/**
+ * Prefer a live (non-cancelled) lesson when several overlap.
+ * @param {LaidOutLesson[]} candidates
+ * @returns {LaidOutLesson | null}
+ */
+function preferLiveLesson(candidates) {
+  if (!candidates.length) return null;
+  return candidates.find((laid) => !isLessonCancelled(laid.item)) ?? candidates[0];
+}
+
+/**
+ * Pick what the scroll viewport should center on.
+ * @param {number} nowMin
+ * @returns {{ key: string, el: HTMLElement | null }}
+ */
+function resolveScrollFocus(nowMin) {
+  const ongoing = preferLiveLesson(
+    laidLessons.filter((laid) => lessonPhase(nowMin, laid) === "current"),
+  );
+  if (ongoing) {
+    return {
+      key: `current:${ongoing.startMin}:${ongoing.endMin}:${ongoing.column}`,
+      el: lessonElement(ongoing),
+    };
+  }
+
+  const upcoming = preferLiveLesson(laidLessons.filter((laid) => laid.startMin > nowMin));
+  if (upcoming) {
+    return {
+      key: `next:${upcoming.startMin}:${upcoming.endMin}:${upcoming.column}`,
+      el: lessonElement(upcoming),
+    };
+  }
+
+  if (nowLineEl && !nowLineEl.hidden) {
+    return { key: "now", el: nowLineEl };
+  }
+
+  return { key: "top", el: null };
+}
+
+/**
+ * Vertically center `el` inside the schedule scroll area.
+ * @param {HTMLElement} el
+ */
+function centerInSchedule(el) {
+  const scroller = scheduleEl;
+  if (!scroller || scroller.clientHeight <= 0) return;
+  const scrollerRect = scroller.getBoundingClientRect();
+  const elRect = el.getBoundingClientRect();
+  const elCenter = elRect.top + elRect.height / 2;
+  const viewCenter = scrollerRect.top + scroller.clientHeight / 2;
+  const nextTop = scroller.scrollTop + (elCenter - viewCenter);
+  const maxTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+  scroller.scrollTop = Math.min(Math.max(0, nextTop), maxTop);
+}
+
+/**
+ * Auto-scroll on first paint and when the active slot changes — not every minute tick.
+ * @param {boolean} [force]
+ */
+function scrollScheduleToFocus(force = false) {
+  if (!laidLessons.length) return;
+  const nowMin = minutesFromMidnight(new Date());
+  const focus = resolveScrollFocus(nowMin);
+  if (!force && focus.key === lastFocusKey) return;
+  lastFocusKey = focus.key;
+
+  if (focus.key === "top" || !focus.el) {
+    scheduleEl.scrollTop = 0;
+    return;
+  }
+  centerInSchedule(focus.el);
+}
+
+/** Refresh past/current/future classes and the nu-line position. */
 function updateNowIndicator() {
   const now = new Date();
   const nowMin = minutesFromMidnight(now);
@@ -424,13 +523,13 @@ function updateNowIndicator() {
     }
   }
 
-  if (!nowLineEl) return;
-
-  const inRange = nowMin >= trackStartMin && nowMin <= trackEndMin;
-  nowLineEl.hidden = !inRange;
-  if (inRange) {
-    nowLineEl.style.top = `${((nowMin - trackStartMin) / 60) * PX_PER_HOUR}px`;
-    nowLineEl.setAttribute("aria-label", `Nu ${formatTime(now)}`);
+  if (nowLineEl) {
+    const inRange = nowMin >= trackStartMin && nowMin <= trackEndMin;
+    nowLineEl.hidden = !inRange;
+    if (inRange) {
+      nowLineEl.style.top = `${((nowMin - trackStartMin) / 60) * PX_PER_HOUR}px`;
+      nowLineEl.setAttribute("aria-label", `Nu ${formatTime(now)}`);
+    }
   }
 }
 
@@ -441,10 +540,16 @@ function stopNowTimer() {
   }
 }
 
+function onNowTick() {
+  updateNowIndicator();
+  // Re-center only when current / next / nu focus identity changes.
+  scrollScheduleToFocus(false);
+}
+
 function startNowTimer() {
   stopNowTimer();
   updateNowIndicator();
-  nowTimer = window.setInterval(updateNowIndicator, NOW_TICK_MS);
+  nowTimer = window.setInterval(onNowTick, NOW_TICK_MS);
 }
 
 /**
@@ -467,6 +572,8 @@ function renderSchedule(items, today) {
   scheduleEl.style.setProperty("--track-height", `${trackHeight}px`);
   nowLineEl = null;
   lessonsListEl = null;
+  lastFocusKey = null;
+  scheduleEl.scrollTop = 0;
 
   if (laidLessons.length === 0) {
     setStatus("empty", "Geen lessen vandaag.");
@@ -506,6 +613,10 @@ function renderSchedule(items, today) {
   body.appendChild(track);
   scheduleEl.appendChild(body);
   startNowTimer();
+  // Layout first so getBoundingClientRect sees real card positions.
+  requestAnimationFrame(() => {
+    scrollScheduleToFocus(true);
+  });
 }
 
 async function loadToday() {

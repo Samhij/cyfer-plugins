@@ -3,13 +3,36 @@
  * Open the cyfer-plugins repo root in VS Code/Cursor for --token / class autocomplete.
  */
 
+html {
+  height: 100%;
+}
+
+body.cyfers-widget {
+  box-sizing: border-box;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .date-label {
+  flex: none;
   margin: 0 0 0.55rem;
   font-size: 0.92rem;
 }
 
 #status {
+  flex: none;
   margin-bottom: 0.55rem;
+}
+
+/* Timeline scroll viewport — date label stays pinned above. */
+.schedule {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 #status.error {

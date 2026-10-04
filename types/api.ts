@@ -378,17 +378,19 @@ export type SomtodayListResponse<T> = {
  * Next delayed-grade publication moment for a student (Somtoday “uitgesteld
  * publiceren”). Singular object — not wrapped in `items`.
  *
- * Assumptions (inferred from Somtoday datetime conventions + product docs; not
- * yet live-checked in Cyfers):
- * - Primary timestamp is `datumTijd` (ISO local wall, often without timezone).
- * - Empty / no schedule: null body, missing timestamp, or non-OK proxy status
+ * Live-checked shape (`$type`: `resultaten.RVolgendePublicatieMoment`):
+ * - Primary timestamp is `value` (ISO string, often with offset).
+ * - `cyfers.fetch` returns this object directly (host proxy unwraps
+ *   `{ ok, status, data }` → `data`).
+ * - Empty / no schedule: null body, missing `value`, or non-OK proxy status
  *   (schools on “direct publiceren”).
- * - Optional `naam` may label one-off extra moments.
+ * - Optional `naam` / older datetime field names kept as defensive fallbacks.
  */
 export type SomtodayResultaatPublicatieMoment = SomtodayEntity & {
-  /** Next reveal timestamp. */
+  /** Next reveal timestamp (ISO). Live field on `RVolgendePublicatieMoment`. */
+  value?: string;
+  /** Older / related Somtoday datetime names — parsers may check these. */
   datumTijd?: string;
-  /** Fallback names seen on related Somtoday entities — parsers may check these. */
   publicatieDatumTijd?: string;
   tijdstip?: string;
   beginDatumTijd?: string;

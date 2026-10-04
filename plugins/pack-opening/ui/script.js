@@ -1056,7 +1056,9 @@
 
   /**
    * Pull a usable Date from the volgende-moment payload.
-   * Primary field: `datumTijd` (Somtoday convention). Fallbacks for related names.
+   * Live shape (`resultaten.RVolgendePublicatieMoment`): `{ value: "<ISO>" }`.
+   * `cyfers.fetch` already unwraps the host proxy to that body (`result.data`).
+   * Fallbacks keep older / related field names working if Somtoday varies.
    * @param {unknown} raw
    * @returns {{ at: Date | null, label: string }}
    */
@@ -1068,7 +1070,14 @@
     const obj = /** @type {any} */ (raw);
     if (Array.isArray(obj.items) && obj.items.length) return parsePublicatieMoment(obj.items[0]);
     const label = typeof obj.naam === "string" ? obj.naam.trim() : "";
-    for (const key of ["datumTijd", "publicatieDatumTijd", "tijdstip", "beginDatumTijd", "datum"]) {
+    for (const key of [
+      "value",
+      "datumTijd",
+      "publicatieDatumTijd",
+      "tijdstip",
+      "beginDatumTijd",
+      "datum",
+    ]) {
       const at = parseDate(obj[key]);
       if (at) return { at, label };
     }

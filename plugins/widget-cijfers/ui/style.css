@@ -3,15 +3,56 @@
  * Open the cyfer-plugins repo root in VS Code/Cursor for --token / class autocomplete.
  */
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 #content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.toolbar {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
   align-items: center;
 }
 
+.year-label {
+  display: inline-flex;
+  min-width: 9.5rem;
+  flex: 1 1 9.5rem;
+}
+
+#yearPick {
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--bg-elevated);
+  color: var(--ink);
+  font: inherit;
+}
+
+#status {
+  margin: 0;
+}
+
+#status.error {
+  color: var(--danger);
+  background: var(--danger-bg);
+  padding: 0.55rem 0.7rem;
+  border-radius: 2px;
+}
+
 #content > table {
   width: 100%;
-  margin-top: 0.5rem;
   border-color: var(--line);
 }

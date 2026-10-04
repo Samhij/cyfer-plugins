@@ -108,6 +108,7 @@
     soundToggle: /** @type {HTMLButtonElement} */ ($("soundToggle")),
     refresh: /** @type {HTMLButtonElement} */ ($("refresh")),
     studentPick: /** @type {HTMLSelectElement} */ ($("studentPick")),
+    yearPick: /** @type {HTMLSelectElement} */ ($("yearPick")),
     clubGrid: $("clubGrid"),
     clubFilters: $("clubFilters"),
     clubSort: /** @type {HTMLSelectElement} */ ($("clubSort")),
@@ -317,6 +318,46 @@
   }
 
   /**
+   * Path key for vakgemiddelden — Somtoday uses plaatsing UUID (not numeric link id).
+   * @param {SomtodayPlaatsing} plaatsing
+   */
+  function plaatsingKeyOf(plaatsing) {
+    const uuid = plaatsing.UUID || plaatsing.uuid;
+    if (uuid) return String(uuid);
+    const selfId = plaatsing.links?.find((l) => l.rel === "self" && l.id != null)?.id;
+    return selfId != null ? String(selfId) : "";
+  }
+
+  /** @param {SomtodayPlaatsing} plaatsing */
+  function plaatsingLabelOf(plaatsing) {
+    const year = plaatsing.schooljaar?.naam?.trim();
+    if (year) return year;
+    if (plaatsing.leerjaar != null) return `Leerjaar ${plaatsing.leerjaar}`;
+    return "Schooljaar";
+  }
+
+  /** @param {SomtodayPlaatsing[]} items */
+  function sortPlaatsingen(items) {
+    return items.slice().sort((a, b) => {
+      const ta = a.vanafDatum ? Date.parse(a.vanafDatum) : NaN;
+      const tb = b.vanafDatum ? Date.parse(b.vanafDatum) : NaN;
+      if (Number.isFinite(tb) && Number.isFinite(ta) && tb !== ta) return tb - ta;
+      return plaatsingLabelOf(b).localeCompare(plaatsingLabelOf(a), "nl");
+    });
+  }
+
+  /**
+   * @param {number} studentId
+   * @returns {Promise<SomtodayPlaatsing[]>}
+   */
+  async function fetchPlaatsingen(studentId) {
+    /** @type {SomtodayListResponse<SomtodayPlaatsing>} */
+    const data = /** @type {any} */ (await cyfers.fetch(`/rest/v1/plaatsingen?leerling=${studentId}`));
+    const items = Array.isArray(data?.items) ? data.items : [];
+    return sortPlaatsingen(items.filter((p) => plaatsingKeyOf(p)));
+  }
+
+  /**
    * @param {string} dossier
    * @param {number} studentId
    * @returns {Promise<SomtodayGrade[]>}
@@ -337,8 +378,13 @@
     return all;
   }
 
-  /** @param {number} studentId */
-  async function loadCards(studentId) {
+  /**
+   * Pack UX needs individual result cards (walkouts, "nieuwe cijfers", weights).
+   * Somtoday's plaatsing-scoped list is vakgemiddelden (averages), so for the
+   * current plaatsing we keep the existing per-result dossier endpoints.
+   * @param {number} studentId
+   */
+  async function loadCardsFromDossier(studentId) {
     const [progress, exams] = await Promise.allSettled([
       fetchDossier("geldendvoortgangsdossierresultaten", studentId),
       fetchDossier("geldendexamendossierresultaten", studentId),
@@ -347,7 +393,7 @@
 
     /** @type {Map<string, GradeCard>} */
     const byKey = new Map();
-    /** @type {[PromiseSettledResult<SomtodayGrade[]>, "voortgang" | "examen"][]} */
+    /** @type {[PromiseSettledResult<SomtodayGrade[]], "voortgang" | "examen"][]} */
     const sources = [[progress, "voortgang"], [exams, "examen"]];
     for (const [result, source] of sources) {
       if (result.status !== "fulfilled") continue;
@@ -363,6 +409,63 @@
       }
     }
     return { cards: [...byKey.values()], partial: progress.status === "rejected" || exams.status === "rejected" };
+  }
+
+  /**
+   * Historical years: build pack cards from subject averages for that plaatsing.
+   * @param {string} plaatsingKey
+   */
+  async function loadCardsFromVakgemiddelden(plaatsingKey) {
+    /** @type {SomtodayVakGemiddelden} */
+    const data = /** @type {any} */ (
+      await cyfers.fetch(`/rest/v1/vakkeuzes/plaatsing/${encodeURIComponent(plaatsingKey)}/vakgemiddelden`)
+    );
+    const items = Array.isArray(data?.gemiddelden) ? data.gemiddelden : [];
+
+    /** @type {Map<string, GradeCard>} */
+    const byKey = new Map();
+    for (const item of items) {
+      const vak = item.vakkeuze?.vak;
+      const name = vak?.naam || vak?.afkorting || "Vak";
+      const abbr = (vak?.afkorting || deriveAbbr(name)).toUpperCase().slice(0, 5);
+      const vakUuid = vak?.UUID || vak?.uuid || "";
+
+      /** @type {[SomtodayGrade | undefined, "voortgang" | "examen", string][]} */
+      const variants = [
+        [item.voortgangsdossierResultaat || item.voortgangsdossierResultaatAfwijkend, "voortgang", "vg"],
+        [item.examendossierResultaat, "examen", "ex"],
+      ];
+      for (const [raw, source, tag] of variants) {
+        if (!raw) continue;
+        const card = normalize(raw, source);
+        if (!card) continue;
+        card.subject = name;
+        card.abbr = abbr;
+        card.description = source === "examen" ? "Examengemiddelde" : "Vakgemiddelde";
+        card.kind = "Gemiddelde";
+        card.niveau = item.niveauOmschrijving || item.afwijkendNiveauOmschrijving || card.niveau;
+        card.key = `vg:${plaatsingKey}:${vakUuid || hashString(name)}:${tag}`;
+        const existing = byKey.get(card.key);
+        if (existing) {
+          if (card.exam) existing.exam = true;
+          continue;
+        }
+        byKey.set(card.key, card);
+      }
+    }
+    return { cards: [...byKey.values()], partial: false };
+  }
+
+  /**
+   * @param {number} studentId
+   * @param {{ key: string, huidig: boolean } | null} plaatsing
+   */
+  async function loadCards(studentId, plaatsing) {
+    if (plaatsing && !plaatsing.huidig) {
+      return loadCardsFromVakgemiddelden(plaatsing.key);
+    }
+    // Fallback: current (or unknown) year needs individual result items for pack UX.
+    return loadCardsFromDossier(studentId);
   }
 
   /* —— Packs —— */
@@ -459,6 +562,11 @@
     students: [],
     /** @type {number | null} */
     studentId: null,
+    /** @type {SomtodayPlaatsing[]} */
+    plaatsingen: [],
+    /** @type {string | null} */
+    plaatsingKey: null,
+    plaatsingHuidig: true,
     /** @type {GradeCard[]} */
     cards: [],
     /** @type {Set<string>} */
@@ -1138,7 +1246,8 @@
   function paintCountdown() {
     const el = els.countdown;
     const onStore = state.view === "store";
-    if (!onStore || state.momentStatus === "idle" || state.momentStatus === "loading") {
+    // Countdown / live reveal is only meaningful for the current school year.
+    if (!state.plaatsingHuidig || !onStore || state.momentStatus === "idle" || state.momentStatus === "loading") {
       el.hidden = true;
       return;
     }
@@ -1415,9 +1524,17 @@
     }
     const total = state.cards.length;
     const unseen = state.cards.filter((c) => !state.seen.has(c.key)).length;
-    els.summary.textContent = total
-      ? `${total} cijfers in je dossier · ${unseen} nog niet geopend`
-      : "Geen cijfers gevonden";
+    const year = state.plaatsingen.find((p) => plaatsingKeyOf(p) === state.plaatsingKey);
+    const yearLabel = year ? plaatsingLabelOf(year) : "";
+    if (!total) {
+      els.summary.textContent = yearLabel ? `Geen cijfers gevonden voor ${yearLabel}` : "Geen cijfers gevonden";
+      return;
+    }
+    if (state.plaatsingHuidig) {
+      els.summary.textContent = `${total} cijfers in je dossier · ${unseen} nog niet geopend`;
+    } else {
+      els.summary.textContent = `${total} vakgemiddelden · ${yearLabel} · ${unseen} nog niet geopend`;
+    }
   }
 
   function setView(view) {
@@ -1442,6 +1559,7 @@
 
   function renderAll() {
     renderSummary();
+    renderYearPick();
     renderStore();
     renderClub();
     els.refresh.disabled = state.loading;
@@ -1449,14 +1567,26 @@
 
   /* —— Persistence (cyfers.storage → host file under plugin-storage/, per student) —— */
 
-  const seenKey = () => `seen:${state.studentId}`;
-  const statsKey = () => `stats:${state.studentId}`;
+  const seenKey = () => `seen:${state.studentId}:${state.plaatsingKey || "unknown"}`;
+  const statsKey = () => `stats:${state.studentId}:${state.plaatsingKey || "unknown"}`;
+  /** Pre-schooljaar keys (current year only) — migrate once into scoped keys. */
+  const legacySeenKey = () => `seen:${state.studentId}`;
+  const legacyStatsKey = () => `stats:${state.studentId}`;
 
   async function loadPersisted() {
-    const [seenRaw, statsRaw] = await Promise.all([
+    let [seenRaw, statsRaw] = await Promise.all([
       cyfers.storage.get(seenKey()).catch(() => null),
       cyfers.storage.get(statsKey()).catch(() => null),
     ]);
+    // Migrate unscoped club progress into the current plaatsing bucket.
+    if (state.plaatsingHuidig && seenRaw == null && statsRaw == null) {
+      const [legacySeen, legacyStats] = await Promise.all([
+        cyfers.storage.get(legacySeenKey()).catch(() => null),
+        cyfers.storage.get(legacyStatsKey()).catch(() => null),
+      ]);
+      seenRaw = legacySeen;
+      statsRaw = legacyStats;
+    }
     try {
       const list = seenRaw ? JSON.parse(seenRaw) : [];
       state.seen = new Set(Array.isArray(list) ? list.map(String) : []);
@@ -1499,13 +1629,31 @@
       if (state.studentId == null) throw new Error("Geen leerling gevonden voor dit account.");
 
       const studentId = state.studentId;
+      state.plaatsingen = await fetchPlaatsingen(studentId);
+      if (!state.plaatsingen.length) throw new Error("Geen plaatsingen gevonden voor deze leerling.");
+
+      let selected = state.plaatsingen.find((p) => plaatsingKeyOf(p) === state.plaatsingKey) || null;
+      if (!selected) {
+        selected = state.plaatsingen.find((p) => p.huidig) || state.plaatsingen[0];
+        state.plaatsingKey = plaatsingKeyOf(selected);
+      }
+      state.plaatsingHuidig = Boolean(selected.huidig);
+      renderYearPick();
+
       await loadPersisted();
+      const plaatsing = { key: state.plaatsingKey, huidig: state.plaatsingHuidig };
       const [{ cards, partial }] = await Promise.all([
-        loadCards(studentId),
-        refreshMoment(studentId),
+        loadCards(studentId, plaatsing),
+        state.plaatsingHuidig ? refreshMoment(studentId) : Promise.resolve(),
       ]);
       if (seq !== state.loadSeq) return;
       state.cards = cards;
+      if (!state.plaatsingHuidig) {
+        state.momentAt = null;
+        state.momentLabel = "";
+        state.momentStatus = "idle";
+        stopCountdownTick();
+      }
       if (partial) setStatus("Niet alle cijfers konden worden geladen; je ziet een deel van je dossier.");
     } catch (error) {
       if (seq !== state.loadSeq) return;
@@ -1518,6 +1666,22 @@
         paintCountdown();
       }
     }
+  }
+
+  function renderYearPick() {
+    if (!state.plaatsingen.length) {
+      els.yearPick.innerHTML = `<option value="">Geen schooljaren</option>`;
+      els.yearPick.disabled = true;
+      return;
+    }
+    els.yearPick.innerHTML = state.plaatsingen
+      .map((p) => {
+        const key = plaatsingKeyOf(p);
+        const selected = key === state.plaatsingKey ? " selected" : "";
+        return `<option value="${escapeHtml(key)}"${selected}>${escapeHtml(plaatsingLabelOf(p))}</option>`;
+      })
+      .join("");
+    els.yearPick.disabled = state.loading;
   }
 
   function renderStudentPick() {
@@ -2136,6 +2300,16 @@
   els.studentPick.addEventListener("change", () => {
     if (run) return;
     state.studentId = Number(els.studentPick.value);
+    state.plaatsingKey = null;
+    state.plaatsingen = [];
+    void load();
+  });
+
+  els.yearPick.addEventListener("change", () => {
+    if (run || state.loading) return;
+    const next = els.yearPick.value || null;
+    if (!next || next === state.plaatsingKey) return;
+    state.plaatsingKey = next;
     void load();
   });
 

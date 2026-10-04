@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-03T23:56:43Z",
+  "updatedAt": "2026-10-04T00:01:14Z",
   "plugins": [
     {
       "id": "widget-cijfers",
@@ -65,8 +65,8 @@
     {
       "id": "cijferpack",
       "name": "Cijferpack",
-      "version": "1.0.0",
-      "description": "Open je cijfers als een dramatisch FIFA-stijl pakket",
+      "version": "1.1.0",
+      "description": "Open je cijfers als een full-stage pack reveal (FIFA-stijl pacing)",
       "author": "Sam Hijmans",
       "kind": "page",
       "nav": {

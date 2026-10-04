@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1" name="viewport" />
+  <title>Packs</title>
+  <link href="style.css" rel="stylesheet" />
+</head>
+<body>
+  <div id="app" class="app">
+    <header class="toolbar">
+      <div class="toolbar-text">
+        <h1>Packs</h1>
+        <p class="lede" id="summary">Cijfers laden…</p>
+      </div>
+      <div class="toolbar-actions">
+        <select id="studentPick" aria-label="Leerling" hidden></select>
+        <div class="tabs" role="tablist" aria-label="Weergave">
+          <button type="button" role="tab" id="tabStore" class="primary" aria-selected="true">Winkel</button>
+          <button type="button" role="tab" id="tabClub" aria-selected="false">Mijn club <span id="clubCount" class="tab-count"></span></button>
+        </div>
+        <button type="button" id="soundToggle" class="sound-toggle" aria-pressed="true">Geluid aan</button>
+        <button type="button" id="refresh">Vernieuwen</button>
+      </div>
+    </header>
+
+    <div id="status" hidden></div>
+
+    <section id="store" class="store" aria-label="Packwinkel"></section>
+
+    <section id="club" class="club" aria-label="Mijn club" hidden>
+      <div class="club-head">
+        <div class="club-progress">
+          <div class="club-progress-text" id="clubProgressText"></div>
+          <div class="club-bar"><span id="clubBar"></span></div>
+        </div>
+        <div class="club-controls">
+          <div class="chips" id="clubFilters" role="group" aria-label="Zeldzaamheid"></div>
+          <label class="club-sort">Sorteren
+            <select id="clubSort">
+              <option value="rating">Hoogste cijfer</option>
+              <option value="date">Nieuwste</option>
+              <option value="subject">Vak (A–Z)</option>
+            </select>
+          </label>
+          <label class="club-missing"><input type="checkbox" id="clubShowMissing" checked /> Niet-geopende tonen</label>
+          <button type="button" id="clubReset" class="ghost">Verzameling wissen</button>
+        </div>
+      </div>
+      <div id="clubGrid" class="card-grid"></div>
+    </section>
+  </div>
+
+  <div id="stage" class="stage" hidden tabindex="-1" role="dialog" aria-modal="true" aria-label="Pack openen">
+    <div class="stage-bg" aria-hidden="true">
+      <div class="spot spot-l"></div>
+      <div class="spot spot-r"></div>
+      <div class="stage-crowd"></div>
+      <div class="stage-floor"></div>
+    </div>
+    <div id="stageContent" class="stage-content"></div>
+    <canvas id="fx" class="stage-fx" aria-hidden="true"></canvas>
+    <div id="flash" class="stage-flash" aria-hidden="true"></div>
+    <div class="stage-hud">
+      <div class="hud-title">
+        <span id="stageTitle"></span>
+        <span id="stageProgress" class="hud-progress"></span>
+      </div>
+      <div class="hud-actions">
+        <button type="button" id="stageSound" class="hud-btn" aria-pressed="true">Geluid aan</button>
+        <button type="button" id="skipBtn" class="hud-btn">Overslaan</button>
+        <button type="button" id="closeBtn" class="hud-btn">Sluiten</button>
+      </div>
+    </div>
+    <p id="stageHint" class="stage-hint" aria-hidden="true"></p>
+    <div id="live" class="sr-only" aria-live="polite"></div>
+  </div>
+
+  <div id="detail" class="detail" hidden role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+    <button type="button" class="detail-backdrop" id="detailBackdrop" aria-label="Sluiten" tabindex="-1"></button>
+    <div class="detail-panel">
+      <div id="detailCard" class="detail-card"></div>
+      <div class="detail-info">
+        <h2 id="detailTitle"></h2>
+        <p id="detailTier" class="detail-tier"></p>
+        <dl id="detailList" class="detail-list"></dl>
+        <button type="button" id="detailClose" class="primary">Sluiten</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

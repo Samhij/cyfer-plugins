@@ -37,6 +37,9 @@
 
   const PAGE_SIZE = 100;
   const MAX_PAGES = 5;
+  /** Concurrent subject fetches for past-year vakresultaten. */
+  const SUBJECT_CONCURRENCY = 4;
+  /** Current-year dossier list — individual toets columns only. */
   const QUERY = [
     "type=Toetskolom",
     "type=DeeltoetsKolom",
@@ -47,6 +50,41 @@
     "additional=naamalternatiefniveau",
     "sort=desc-geldendResultaatCijferInvoer",
   ].join("&");
+  /**
+   * Past-year per-subject query — matches Somtoday/NONtoday vakresultaten.
+   * Average column types are requested then filtered client-side so pack cards
+   * stay individual results (not periode-/rapport-/SE-gemiddelden).
+   */
+  const VAK_QUERY = [
+    "additional=vaknaam",
+    "additional=resultaatkolom",
+    "additional=heeftalternatiefniveau",
+    "additional=naamalternatiefniveau",
+    "additional=naamstandaardniveau",
+    "additional=leerjaar",
+    "additional=periodeAfkorting",
+    "type=Toetskolom",
+    "type=SamengesteldeToetsKolom",
+    "type=Werkstukcijferkolom",
+    "type=Advieskolom",
+    "type=PeriodeGemiddeldeKolom",
+    "type=RapportGemiddeldeKolom",
+    "type=RapportCijferKolom",
+    "type=RapportToetskolom",
+    "type=SEGemiddeldeKolom",
+    "type=ToetssoortGemiddeldeKolom",
+    "sort=desc-geldendResultaatCijferInvoer",
+  ].join("&");
+  /** Column types treated as real grades (pack cards), not averages. */
+  const GRADE_COLUMN_TYPES = new Set([
+    "Toetskolom",
+    "DeeltoetsKolom",
+    "SamengesteldeToetsKolom",
+    "Werkstukcijferkolom",
+    "Advieskolom",
+    "RapportCijferKolom",
+    "RapportToetskolom",
+  ]);
 
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   /** Global animation time multiplier. */
@@ -76,8 +114,11 @@
   const TYPE_LABELS = {
     Toetskolom: "Toets",
     DeeltoetsKolom: "Deeltoets",
+    SamengesteldeToetsKolom: "Samengestelde toets",
     Werkstukcijferkolom: "Werkstuk",
     Advieskolom: "Advies",
+    RapportCijferKolom: "Rapportcijfer",
+    RapportToetskolom: "Rapporttoets",
   };
 
   /** @type {[RegExp, string][]} */
@@ -378,9 +419,30 @@
   }
 
   /**
+   * @param {SomtodayGrade[]} items
+   * @param {"voortgang" | "examen"} source
+   * @param {Map<string, GradeCard>} byKey
+   * @param {{ name?: string, abbr?: string } | null} [subjectHint]
+   */
+  function mergeGrades(items, source, byKey, subjectHint = null) {
+    for (const raw of items) {
+      if (raw?.type && !GRADE_COLUMN_TYPES.has(raw.type)) continue;
+      const card = normalize(raw, source);
+      if (!card) continue;
+      if (subjectHint?.name) card.subject = subjectHint.name;
+      if (subjectHint?.abbr) card.abbr = subjectHint.abbr;
+      const existing = byKey.get(card.key);
+      if (existing) {
+        if (card.exam) existing.exam = true;
+        continue;
+      }
+      byKey.set(card.key, card);
+    }
+  }
+
+  /**
    * Pack UX needs individual result cards (walkouts, "nieuwe cijfers", weights).
-   * Somtoday's plaatsing-scoped list is vakgemiddelden (averages), so for the
-   * current plaatsing we keep the existing per-result dossier endpoints.
+   * Current plaatsing: per-result dossier list endpoints.
    * @param {number} studentId
    */
   async function loadCardsFromDossier(studentId) {
@@ -392,67 +454,121 @@
 
     /** @type {Map<string, GradeCard>} */
     const byKey = new Map();
-    /** @type {[PromiseSettledResult<SomtodayGrade[]], "voortgang" | "examen"][]} */
-    const sources = [[progress, "voortgang"], [exams, "examen"]];
-    for (const [result, source] of sources) {
-      if (result.status !== "fulfilled") continue;
-      for (const raw of result.value) {
-        const card = normalize(raw, source);
-        if (!card) continue;
-        const existing = byKey.get(card.key);
-        if (existing) {
-          if (card.exam) existing.exam = true;
-          continue;
-        }
-        byKey.set(card.key, card);
-      }
-    }
+    if (progress.status === "fulfilled") mergeGrades(progress.value, "voortgang", byKey);
+    if (exams.status === "fulfilled") mergeGrades(exams.value, "examen", byKey);
     return { cards: [...byKey.values()], partial: progress.status === "rejected" || exams.status === "rejected" };
   }
 
   /**
-   * Historical years: build pack cards from subject averages for that plaatsing.
+   * @template T, R
+   * @param {T[]} items
+   * @param {number} concurrency
+   * @param {(item: T, index: number) => Promise<R>} fn
+   * @returns {Promise<R[]>}
+   */
+  async function mapPool(items, concurrency, fn) {
+    /** @type {R[]} */
+    const out = new Array(items.length);
+    let next = 0;
+    const workers = Array.from({ length: Math.min(concurrency, Math.max(1, items.length)) }, async () => {
+      while (next < items.length) {
+        const i = next;
+        next += 1;
+        out[i] = await fn(items[i], i);
+      }
+    });
+    await Promise.all(workers);
+    return out;
+  }
+
+  /**
+   * Discover vak + lichting UUIDs from a plaatsing’s vakgemiddelden response.
+   * Live shape: `gemiddelden[].vakkeuze.vak.UUID` + `vakkeuze.lichting.UUID`
+   * (fallback: `relevanteCijferLichting`).
+   * @param {SomtodayVakGemiddelde[]} items
+   */
+  function subjectsFromGemiddelden(items) {
+    /** @type {Map<string, { vakUuid: string, lichtingUuid: string, name: string, abbr: string }>} */
+    const byKey = new Map();
+    for (const item of items) {
+      const vk = item.vakkeuze;
+      if (!vk) continue;
+      const vak = vk.vak;
+      const lichting = vk.lichting || vk.relevanteCijferLichting;
+      const vakUuid = vak?.UUID || vak?.uuid || "";
+      const lichtingUuid = lichting?.UUID || lichting?.uuid || "";
+      if (!vakUuid || !lichtingUuid) continue;
+      const name = vak?.naam || vak?.afkorting || "Vak";
+      const key = `${vakUuid}:${lichtingUuid}`;
+      if (byKey.has(key)) continue;
+      byKey.set(key, {
+        vakUuid,
+        lichtingUuid,
+        name,
+        abbr: (vak?.afkorting || deriveAbbr(name)).toUpperCase().slice(0, 5),
+      });
+    }
+    return [...byKey.values()];
+  }
+
+  /**
+   * @param {string} dossier
+   * @param {number} studentId
+   * @param {string} vakUuid
+   * @param {string} lichtingUuid
+   * @param {string} plaatsingKey
+   * @returns {Promise<SomtodayGrade[]>}
+   */
+  async function fetchVakresultaten(dossier, studentId, vakUuid, lichtingUuid, plaatsingKey) {
+    const path =
+      `/rest/v1/${dossier}/vakresultaten/${studentId}` +
+      `/vak/${encodeURIComponent(vakUuid)}` +
+      `/lichting/${encodeURIComponent(lichtingUuid)}` +
+      `?${VAK_QUERY}&plaatsingUuid=${encodeURIComponent(plaatsingKey)}`;
+    /** @type {SomtodayListResponse<SomtodayGrade> | SomtodayGrade[]} */
+    const data = /** @type {any} */ (await cyfers.fetch(path));
+    if (Array.isArray(data)) return data;
+    return Array.isArray(data?.items) ? data.items : [];
+  }
+
+  /**
+   * Historical (and non-current) years: no bulk individual-grade list exists.
+   * Discover subjects via vakgemiddelden, then fetch voortgang + examen
+   * vakresultaten per subject and flatten into pack cards.
+   * @param {number} studentId
    * @param {string} plaatsingKey
    */
-  async function loadCardsFromVakgemiddelden(plaatsingKey) {
+  async function loadCardsFromVakresultaten(studentId, plaatsingKey) {
     /** @type {SomtodayVakGemiddelden} */
-    const data = /** @type {any} */ (
+    const averages = /** @type {any} */ (
       await cyfers.fetch(`/rest/v1/vakkeuzes/plaatsing/${encodeURIComponent(plaatsingKey)}/vakgemiddelden`)
     );
-    const items = Array.isArray(data?.gemiddelden) ? data.gemiddelden : [];
+    const subjects = subjectsFromGemiddelden(Array.isArray(averages?.gemiddelden) ? averages.gemiddelden : []);
+    if (!subjects.length) return { cards: [], partial: false };
 
     /** @type {Map<string, GradeCard>} */
     const byKey = new Map();
-    for (const item of items) {
-      const vak = item.vakkeuze?.vak;
-      const name = vak?.naam || vak?.afkorting || "Vak";
-      const abbr = (vak?.afkorting || deriveAbbr(name)).toUpperCase().slice(0, 5);
-      const vakUuid = vak?.UUID || vak?.uuid || "";
+    let failures = 0;
 
-      /** @type {[SomtodayGrade | undefined, "voortgang" | "examen", string][]} */
-      const variants = [
-        [item.voortgangsdossierResultaat || item.voortgangsdossierResultaatAfwijkend, "voortgang", "vg"],
-        [item.examendossierResultaat, "examen", "ex"],
-      ];
-      for (const [raw, source, tag] of variants) {
-        if (!raw) continue;
-        const card = normalize(raw, source);
-        if (!card) continue;
-        card.subject = name;
-        card.abbr = abbr;
-        card.description = source === "examen" ? "Examengemiddelde" : "Vakgemiddelde";
-        card.kind = "Gemiddelde";
-        card.niveau = item.niveauOmschrijving || item.afwijkendNiveauOmschrijving || card.niveau;
-        card.key = `vg:${plaatsingKey}:${vakUuid || hashString(name)}:${tag}`;
-        const existing = byKey.get(card.key);
-        if (existing) {
-          if (card.exam) existing.exam = true;
-          continue;
-        }
-        byKey.set(card.key, card);
+    await mapPool(subjects, SUBJECT_CONCURRENCY, async (subject) => {
+      const [progress, exams] = await Promise.allSettled([
+        fetchVakresultaten("geldendvoortgangsdossierresultaten", studentId, subject.vakUuid, subject.lichtingUuid, plaatsingKey),
+        fetchVakresultaten("geldendexamendossierresultaten", studentId, subject.vakUuid, subject.lichtingUuid, plaatsingKey),
+      ]);
+      if (progress.status === "rejected" && exams.status === "rejected") {
+        failures += 1;
+        return;
       }
+      if (progress.status === "rejected" || exams.status === "rejected") failures += 1;
+      const hint = { name: subject.name, abbr: subject.abbr };
+      if (progress.status === "fulfilled") mergeGrades(progress.value, "voortgang", byKey, hint);
+      if (exams.status === "fulfilled") mergeGrades(exams.value, "examen", byKey, hint);
+    });
+
+    if (!byKey.size && failures === subjects.length) {
+      throw new Error("Kon geen cijfers laden voor dit schooljaar.");
     }
-    return { cards: [...byKey.values()], partial: false };
+    return { cards: [...byKey.values()], partial: failures > 0 };
   }
 
   /**
@@ -461,9 +577,9 @@
    */
   async function loadCards(studentId, plaatsing) {
     if (plaatsing && !plaatsing.huidig) {
-      return loadCardsFromVakgemiddelden(plaatsing.key);
+      return loadCardsFromVakresultaten(studentId, plaatsing.key);
     }
-    // Fallback: current (or unknown) year needs individual result items for pack UX.
+    // Current (or unknown) year: dossier list already returns individual results.
     return loadCardsFromDossier(studentId);
   }
 
@@ -1532,7 +1648,7 @@
     if (state.plaatsingHuidig) {
       els.summary.textContent = `${total} cijfers in je dossier · ${unseen} nog niet geopend`;
     } else {
-      els.summary.textContent = `${total} vakgemiddelden · ${yearLabel} · ${unseen} nog niet geopend`;
+      els.summary.textContent = `${total} cijfers · ${yearLabel} · ${unseen} nog niet geopend`;
     }
   }
 

@@ -7,6 +7,56 @@ const yearPick = /** @type {HTMLSelectElement} */ (document.getElementById("year
 /** @type {HTMLElement} */
 const statusEl = /** @type {HTMLElement} */ (document.getElementById("status"));
 
+const SUBJECT_CONCURRENCY = 4;
+
+/** Current-year dossier list — individual toets columns. */
+const QUERY = [
+  "type=Toetskolom",
+  "type=DeeltoetsKolom",
+  "type=Werkstukcijferkolom",
+  "type=Advieskolom",
+  "additional=vaknaam",
+  "additional=resultaatkolom",
+  "additional=naamalternatiefniveau",
+  "sort=desc-geldendResultaatCijferInvoer",
+].join("&");
+
+/**
+ * Past-year per-subject query — matches Somtoday/NONtoday vakresultaten.
+ * Average column types are requested then filtered client-side.
+ */
+const VAK_QUERY = [
+  "additional=vaknaam",
+  "additional=resultaatkolom",
+  "additional=heeftalternatiefniveau",
+  "additional=naamalternatiefniveau",
+  "additional=naamstandaardniveau",
+  "additional=leerjaar",
+  "additional=periodeAfkorting",
+  "type=Toetskolom",
+  "type=SamengesteldeToetsKolom",
+  "type=Werkstukcijferkolom",
+  "type=Advieskolom",
+  "type=PeriodeGemiddeldeKolom",
+  "type=RapportGemiddeldeKolom",
+  "type=RapportCijferKolom",
+  "type=RapportToetskolom",
+  "type=SEGemiddeldeKolom",
+  "type=ToetssoortGemiddeldeKolom",
+  "sort=desc-geldendResultaatCijferInvoer",
+].join("&");
+
+/** Real grade columns (not periode-/rapport-/SE-/toetssoort-gemiddelden). */
+const GRADE_COLUMN_TYPES = new Set([
+  "Toetskolom",
+  "DeeltoetsKolom",
+  "SamengesteldeToetsKolom",
+  "Werkstukcijferkolom",
+  "Advieskolom",
+  "RapportCijferKolom",
+  "RapportToetskolom",
+]);
+
 const state = {
   /** @type {number | null} */
   studentId: null,
@@ -14,6 +64,7 @@ const state = {
   plaatsingen: [],
   /** @type {string | null} */
   plaatsingKey: null,
+  plaatsingHuidig: true,
   loadSeq: 0,
 };
 
@@ -26,7 +77,7 @@ function escapeHtml(value) {
 }
 
 /**
- * Path key for vakgemiddelden — Somtoday/NONtoday uses UUID, not numeric link id.
+ * Path key for plaatsing-scoped APIs — Somtoday/NONtoday uses UUID, not numeric link id.
  * @param {SomtodayPlaatsing} plaatsing
  */
 function plaatsingKeyOf(plaatsing) {
@@ -78,14 +129,24 @@ function registerEventListeners() {
   });
 
   yearPick.addEventListener("change", () => {
-    state.plaatsingKey = yearPick.value || null;
-    void loadGemiddelden();
+    const next = yearPick.value || null;
+    state.plaatsingKey = next;
+    const selected = state.plaatsingen.find((p) => plaatsingKeyOf(p) === next);
+    state.plaatsingHuidig = Boolean(selected?.huidig);
+    void loadGrades();
   });
 }
 
-/** @param {SomtodayGrade | undefined} grade */
+/** @param {SomtodayGrade} grade */
+function subjectOf(grade) {
+  const vak = grade.additionalObjects?.vaknaam;
+  if (typeof vak === "string" && vak) return vak;
+  if (vak && typeof vak === "object") return vak.naam || vak.afkorting || "Vak";
+  return grade.vak?.naam || grade.vak?.afkorting || "Vak";
+}
+
+/** @param {SomtodayGrade} grade */
 function scoreOf(grade) {
-  if (!grade) return null;
   const value =
     grade.label ||
     grade.formattedResultaat ||
@@ -97,25 +158,38 @@ function scoreOf(grade) {
   return String(value);
 }
 
-/** @param {SomtodayVakGemiddelde} item */
-function subjectOf(item) {
-  const vak = item.vakkeuze?.vak;
-  return vak?.naam || vak?.afkorting || "Vak";
+/** @param {SomtodayGrade} grade */
+function dateOf(grade) {
+  const raw = grade.datumInvoer || grade.datumInvoerEerstePoging || grade.datumInvoerTweedePoging;
+  if (!raw) return "—";
+  return new Date(raw).toLocaleDateString("nl-NL", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+/** @param {SomtodayGrade} grade */
+function isGradeColumn(grade) {
+  if (!grade?.type) return true;
+  return GRADE_COLUMN_TYPES.has(grade.type);
 }
 
 /**
  * @param {HTMLTableElement} table
- * @param {{ subject: string, score: string | null, niveau: string }[]} rows
+ * @param {SomtodayGrade[]} items
  */
-function fillTable(table, rows) {
+function fillTable(table, items) {
   const tbody = table.querySelector("tbody");
   tbody.replaceChildren();
 
   let count = 0;
-  for (const row of rows) {
-    if (!row.score) continue;
+  for (const grade of items) {
+    if (!isGradeColumn(grade)) continue;
+    const score = scoreOf(grade);
+    if (!score) continue;
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${escapeHtml(row.subject)}</td><td>${escapeHtml(row.score)}</td><td>${escapeHtml(row.niveau || "—")}</td>`;
+    tr.innerHTML = `<td>${escapeHtml(subjectOf(grade))}</td><td>${escapeHtml(score)}</td><td>${escapeHtml(dateOf(grade))}</td>`;
     tbody.appendChild(tr);
     count += 1;
   }
@@ -156,6 +230,19 @@ async function loadPlaatsingen(studentId) {
 }
 
 /**
+ * @param {string} kind
+ * @param {number} studentId
+ * @returns {Promise<SomtodayGrade[]>}
+ */
+async function loadDossierGrades(kind, studentId) {
+  /** @type {SomtodayListResponse<SomtodayGrade>} */
+  const data = await cyfers.fetch(`/rest/v1/${kind}/leerling/${studentId}?${QUERY}`, {
+    headers: { range: "items=0-99" },
+  });
+  return data?.items ?? [];
+}
+
+/**
  * @param {string} plaatsingKey
  * @returns {Promise<SomtodayVakGemiddelde[]>}
  */
@@ -165,10 +252,127 @@ async function fetchVakgemiddelden(plaatsingKey) {
   return Array.isArray(data?.gemiddelden) ? data.gemiddelden : [];
 }
 
-async function loadGemiddelden() {
+/**
+ * Discover vak + lichting UUIDs from vakgemiddelden.
+ * Live shape: `vakkeuze.vak.UUID` + `vakkeuze.lichting.UUID`
+ * (fallback: `relevanteCijferLichting`).
+ * @param {SomtodayVakGemiddelde[]} items
+ */
+function subjectsFromGemiddelden(items) {
+  /** @type {Map<string, { vakUuid: string, lichtingUuid: string, name: string }>} */
+  const byKey = new Map();
+  for (const item of items) {
+    const vk = item.vakkeuze;
+    if (!vk) continue;
+    const vak = vk.vak;
+    const lichting = vk.lichting || vk.relevanteCijferLichting;
+    const vakUuid = vak?.UUID || vak?.uuid || "";
+    const lichtingUuid = lichting?.UUID || lichting?.uuid || "";
+    if (!vakUuid || !lichtingUuid) continue;
+    const key = `${vakUuid}:${lichtingUuid}`;
+    if (byKey.has(key)) continue;
+    byKey.set(key, {
+      vakUuid,
+      lichtingUuid,
+      name: vak?.naam || vak?.afkorting || "Vak",
+    });
+  }
+  return [...byKey.values()];
+}
+
+/**
+ * @template T, R
+ * @param {T[]} items
+ * @param {number} concurrency
+ * @param {(item: T) => Promise<R>} fn
+ * @returns {Promise<R[]>}
+ */
+async function mapPool(items, concurrency, fn) {
+  /** @type {R[]} */
+  const out = new Array(items.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(concurrency, Math.max(1, items.length)) }, async () => {
+    while (next < items.length) {
+      const i = next;
+      next += 1;
+      out[i] = await fn(items[i]);
+    }
+  });
+  await Promise.all(workers);
+  return out;
+}
+
+/**
+ * @param {string} dossier
+ * @param {number} studentId
+ * @param {string} vakUuid
+ * @param {string} lichtingUuid
+ * @param {string} plaatsingKey
+ * @returns {Promise<SomtodayGrade[]>}
+ */
+async function fetchVakresultaten(dossier, studentId, vakUuid, lichtingUuid, plaatsingKey) {
+  const path =
+    `/rest/v1/${dossier}/vakresultaten/${studentId}` +
+    `/vak/${encodeURIComponent(vakUuid)}` +
+    `/lichting/${encodeURIComponent(lichtingUuid)}` +
+    `?${VAK_QUERY}&plaatsingUuid=${encodeURIComponent(plaatsingKey)}`;
+  /** @type {SomtodayListResponse<SomtodayGrade> | SomtodayGrade[]} */
+  const data = /** @type {any} */ (await cyfers.fetch(path));
+  if (Array.isArray(data)) return data;
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+/**
+ * Past year: no bulk individual-grade list — discover subjects, then fetch
+ * voortgang + examen vakresultaten per subject.
+ * @param {number} studentId
+ * @param {string} plaatsingKey
+ */
+async function loadPastYearGrades(studentId, plaatsingKey) {
+  const averages = await fetchVakgemiddelden(plaatsingKey);
+  const subjects = subjectsFromGemiddelden(averages);
+  /** @type {SomtodayGrade[]} */
+  const normal = [];
+  /** @type {SomtodayGrade[]} */
+  const exam = [];
+  let failures = 0;
+
+  await mapPool(subjects, SUBJECT_CONCURRENCY, async (subject) => {
+    const [progress, exams] = await Promise.allSettled([
+      fetchVakresultaten("geldendvoortgangsdossierresultaten", studentId, subject.vakUuid, subject.lichtingUuid, plaatsingKey),
+      fetchVakresultaten("geldendexamendossierresultaten", studentId, subject.vakUuid, subject.lichtingUuid, plaatsingKey),
+    ]);
+    if (progress.status === "rejected" && exams.status === "rejected") {
+      failures += 1;
+      return;
+    }
+    if (progress.status === "rejected" || exams.status === "rejected") failures += 1;
+    if (progress.status === "fulfilled") {
+      for (const g of progress.value) {
+        if (!g.vak && subject.name) g.vak = { naam: subject.name };
+        normal.push(g);
+      }
+    }
+    if (exams.status === "fulfilled") {
+      for (const g of exams.value) {
+        if (!g.vak && subject.name) g.vak = { naam: subject.name };
+        exam.push(g);
+      }
+    }
+  });
+
+  if (!subjects.length) return { normal, exam, partial: false };
+  if (!normal.length && !exam.length && failures === subjects.length) {
+    throw new Error("Kon geen cijfers laden voor dit schooljaar.");
+  }
+  return { normal, exam, partial: failures > 0 };
+}
+
+async function loadGrades() {
   const seq = ++state.loadSeq;
   const key = state.plaatsingKey;
-  if (!key) {
+  const studentId = state.studentId;
+  if (!key || studentId == null) {
     fillTable(gradesTable, []);
     fillTable(examGradesTable, []);
     setStatus("Geen plaatsing geselecteerd.");
@@ -178,24 +382,36 @@ async function loadGemiddelden() {
   yearPick.disabled = true;
   setStatus("Cijfers laden…", "muted");
   try {
-    const items = await fetchVakgemiddelden(key);
+    /** @type {SomtodayGrade[]} */
+    let normal;
+    /** @type {SomtodayGrade[]} */
+    let exam;
+    let partial = false;
+
+    if (state.plaatsingHuidig) {
+      const [n, e] = await Promise.all([
+        loadDossierGrades("geldendvoortgangsdossierresultaten", studentId),
+        loadDossierGrades("geldendexamendossierresultaten", studentId),
+      ]);
+      normal = n;
+      exam = e;
+    } else {
+      const past = await loadPastYearGrades(studentId, key);
+      normal = past.normal;
+      exam = past.exam;
+      partial = past.partial;
+    }
+
     if (seq !== state.loadSeq) return;
 
-    const sorted = items.slice().sort((a, b) => subjectOf(a).localeCompare(subjectOf(b), "nl"));
-    const normal = sorted.map((item) => ({
-      subject: subjectOf(item),
-      score: scoreOf(item.voortgangsdossierResultaat || item.voortgangsdossierResultaatAfwijkend),
-      niveau: item.niveauOmschrijving || item.afwijkendNiveauOmschrijving || "",
-    }));
-    const exam = sorted.map((item) => ({
-      subject: subjectOf(item),
-      score: scoreOf(item.examendossierResultaat),
-      niveau: item.niveauOmschrijving || "",
-    }));
-
-    fillTable(gradesTable, normal);
-    fillTable(examGradesTable, exam);
-    setStatus("");
+    const byDateDesc = (/** @type {SomtodayGrade} */ a, /** @type {SomtodayGrade} */ b) => {
+      const ta = Date.parse(a.datumInvoer || a.datumInvoerEerstePoging || "") || 0;
+      const tb = Date.parse(b.datumInvoer || b.datumInvoerEerstePoging || "") || 0;
+      return tb - ta;
+    };
+    fillTable(gradesTable, normal.slice().sort(byDateDesc));
+    fillTable(examGradesTable, exam.slice().sort(byDateDesc));
+    setStatus(partial ? "Niet alle vakken konden worden geladen; je ziet een deel van de cijfers." : "");
   } catch (error) {
     if (seq !== state.loadSeq) return;
     fillTable(gradesTable, []);
@@ -223,6 +439,7 @@ async function main() {
     state.plaatsingen = await loadPlaatsingen(studentId);
     const current = state.plaatsingen.find((p) => p.huidig) || state.plaatsingen[0] || null;
     state.plaatsingKey = current ? plaatsingKeyOf(current) : null;
+    state.plaatsingHuidig = Boolean(current?.huidig);
     renderYearPick();
 
     if (!state.plaatsingKey) {
@@ -232,7 +449,7 @@ async function main() {
       return;
     }
 
-    await loadGemiddelden();
+    await loadGrades();
   } catch (error) {
     const message = error instanceof Error ? error.message : "Laden mislukt.";
     setStatus(message, "error");

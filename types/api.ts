@@ -424,16 +424,28 @@ export type SomtodayPlaatsing = SomtodayEntity & {
   };
 };
 
-/** Nested subject choice on vakgemiddelden (`RVakkeuze`). */
+/** Nested lichting on a vakkeuze (`RLichting`) — UUID feeds vakresultaten paths. */
+export type SomtodayLichting = SomtodayEntity & {
+  UUID?: string;
+  uuid?: string;
+  naam?: string;
+};
+
+/**
+ * Nested subject choice on vakgemiddelden (`RVakkeuze`).
+ *
+ * Per-subject individual grades for a past plaatsing come from
+ * `…/vakresultaten/{studentId}/vak/{vak.UUID}/lichting/{lichting.UUID}`.
+ * Prefer `lichting` (live NONtoday / takeout shape); fall back to
+ * `relevanteCijferLichting` when present.
+ */
 export type SomtodayVakkeuze = SomtodayEntity & {
   vrijstelling?: boolean;
   vak?: SomtodayVak;
   leerling?: SomtodayStudent | SomtodayEntity;
-  relevanteCijferLichting?: SomtodayEntity & {
-    UUID?: string;
-    uuid?: string;
-    naam?: string;
-  };
+  /** Primary lichting UUID source for vakresultaten. */
+  lichting?: SomtodayLichting;
+  relevanteCijferLichting?: SomtodayLichting;
 };
 
 /**

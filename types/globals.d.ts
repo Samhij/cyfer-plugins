@@ -34,6 +34,7 @@ import type {
   SomtodayStudiewijzer as _SomtodayStudiewijzer,
   SomtodayStudiewijzerItem as _SomtodayStudiewijzerItem,
   SomtodayStudiewijzerItemAfspraakToekenning as _SomtodayStudiewijzerItemAfspraakToekenning,
+  SomtodayLichting as _SomtodayLichting,
   SomtodayVak as _SomtodayVak,
   SomtodayVakGemiddelde as _SomtodayVakGemiddelde,
   SomtodayVakGemiddelden as _SomtodayVakGemiddelden,
@@ -71,6 +72,7 @@ declare global {
   type SomtodayListResponse<T> = _SomtodayListResponse<T>;
   type SomtodayResultaatPublicatieMoment = _SomtodayResultaatPublicatieMoment;
   type SomtodayPlaatsing = _SomtodayPlaatsing;
+  type SomtodayLichting = _SomtodayLichting;
   type SomtodayVakkeuze = _SomtodayVakkeuze;
   type SomtodayVakGemiddelde = _SomtodayVakGemiddelde;
   type SomtodayVakGemiddelden = _SomtodayVakGemiddelden;

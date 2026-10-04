@@ -371,3 +371,27 @@ export type SomtodayListResponse<T> = {
   /** Envelope-level tips (NONtoday); cancellation may also sit on each item. */
   statusNotifications?: SomtodayStatusNotification[];
 };
+
+/**
+ * `GET /rest/v1/resultaatpublicatiemomenten/volgende/leerling/{studentId}`
+ *
+ * Next delayed-grade publication moment for a student (Somtoday “uitgesteld
+ * publiceren”). Singular object — not wrapped in `items`.
+ *
+ * Assumptions (inferred from Somtoday datetime conventions + product docs; not
+ * yet live-checked in Cyfers):
+ * - Primary timestamp is `datumTijd` (ISO local wall, often without timezone).
+ * - Empty / no schedule: null body, missing timestamp, or non-OK proxy status
+ *   (schools on “direct publiceren”).
+ * - Optional `naam` may label one-off extra moments.
+ */
+export type SomtodayResultaatPublicatieMoment = SomtodayEntity & {
+  /** Next reveal timestamp. */
+  datumTijd?: string;
+  /** Fallback names seen on related Somtoday entities — parsers may check these. */
+  publicatieDatumTijd?: string;
+  tijdstip?: string;
+  beginDatumTijd?: string;
+  /** Optional label (e.g. one-off extra publicatiemoment). */
+  naam?: string;
+};

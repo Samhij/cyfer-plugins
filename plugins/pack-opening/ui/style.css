@@ -108,6 +108,164 @@ button.primary .tab-count:not(:empty) {
   color: var(--ink);
 }
 
+/* —— Reveal countdown (next publicatiemoment) —— */
+
+.reveal-cd {
+  --rc-glow: #ffd54a;
+  --rc-ink: var(--ink);
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 1rem;
+  padding: 1rem 1.1rem 1.05rem;
+  border: 1px solid color-mix(in srgb, var(--rc-glow) 45%, var(--line));
+  border-radius: 8px;
+  background:
+    radial-gradient(120% 90% at 10% 0%, color-mix(in srgb, var(--rc-glow) 28%, transparent), transparent 55%),
+    radial-gradient(90% 80% at 90% 100%, color-mix(in srgb, var(--rc-glow) 14%, transparent), transparent 50%),
+    linear-gradient(160deg, color-mix(in srgb, var(--bg-elevated) 92%, #000) 0%, var(--bg-elevated) 100%);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--rc-glow) 18%, transparent) inset,
+    0 18px 40px -28px color-mix(in srgb, var(--rc-glow) 55%, transparent);
+}
+
+.reveal-cd::before {
+  content: "";
+  position: absolute;
+  inset: -40% -20%;
+  background: conic-gradient(from 180deg at 50% 50%, transparent 0deg, color-mix(in srgb, var(--rc-glow) 16%, transparent) 60deg, transparent 120deg);
+  opacity: 0.55;
+  animation: rc-sweep 7s linear infinite;
+  pointer-events: none;
+}
+
+.reveal-cd > * {
+  position: relative;
+  z-index: 1;
+}
+
+.reveal-cd-kicker {
+  margin: 0 0 0.35rem;
+  font-family: var(--font-display), "Syne", sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--rc-glow) 75%, var(--muted));
+}
+
+.reveal-cd-digits {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0.45rem 0.55rem;
+  margin: 0.15rem 0 0.45rem;
+}
+
+.reveal-cd-unit {
+  display: grid;
+  justify-items: center;
+  min-width: 3.4rem;
+  padding: 0.35rem 0.45rem 0.4rem;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--rc-glow) 35%, var(--line));
+  background: color-mix(in srgb, #0a0c12 55%, var(--bg-elevated));
+  box-shadow: 0 0 18px -10px var(--rc-glow);
+}
+
+.reveal-cd-unit strong {
+  font-family: var(--font-display), "Syne", sans-serif;
+  font-size: clamp(1.55rem, 4.5vw, 2.35rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  color: var(--rc-ink);
+  text-shadow: 0 0 18px color-mix(in srgb, var(--rc-glow) 70%, transparent);
+}
+
+.reveal-cd-unit span {
+  margin-top: 0.2rem;
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.reveal-cd-sep {
+  align-self: center;
+  padding-bottom: 0.85rem;
+  font-family: var(--font-display), "Syne", sans-serif;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--rc-glow) 80%, var(--muted));
+  opacity: 0.85;
+  animation: rc-blink 1.2s steps(1) infinite;
+}
+
+.reveal-cd-meta {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+.reveal-cd-meta strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.reveal-cd.is-urgent {
+  --rc-glow: #ff8a00;
+}
+
+.reveal-cd.is-critical {
+  --rc-glow: #ff4d4d;
+  animation: rc-pulse 0.85s ease-in-out infinite;
+}
+
+.reveal-cd.is-live {
+  --rc-glow: #5dff9a;
+}
+
+.reveal-cd.is-empty {
+  --rc-glow: var(--muted);
+  box-shadow: none;
+}
+
+.reveal-cd.is-empty::before,
+.reveal-cd.is-empty .reveal-cd-sep {
+  display: none;
+}
+
+.reveal-cd-empty {
+  margin: 0.15rem 0 0;
+  font-family: var(--font-display), "Syne", sans-serif;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+
+@keyframes rc-sweep {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes rc-blink {
+  50% { opacity: 0.25; }
+}
+
+@keyframes rc-pulse {
+  0%, 100% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--rc-glow) 22%, transparent) inset, 0 0 22px -8px var(--rc-glow); }
+  50% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--rc-glow) 45%, transparent) inset, 0 0 36px -4px var(--rc-glow); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-cd::before,
+  .reveal-cd-sep,
+  .reveal-cd.is-critical {
+    animation: none;
+  }
+}
+
 .pack-tile {
   position: relative;
   display: grid;

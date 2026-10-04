@@ -26,6 +26,7 @@ import type {
   SomtodayLink as _SomtodayLink,
   SomtodayListResponse as _SomtodayListResponse,
   SomtodayPermission as _SomtodayPermission,
+  SomtodayResultaatPublicatieMoment as _SomtodayResultaatPublicatieMoment,
   SomtodaySchooljaar as _SomtodaySchooljaar,
   SomtodayStatusNotification as _SomtodayStatusNotification,
   SomtodayStudent as _SomtodayStudent,
@@ -64,6 +65,7 @@ declare global {
   type SomtodayBoodschap = _SomtodayBoodschap;
   type SomtodayBoodschapConversatie = _SomtodayBoodschapConversatie;
   type SomtodayListResponse<T> = _SomtodayListResponse<T>;
+  type SomtodayResultaatPublicatieMoment = _SomtodayResultaatPublicatieMoment;
 
   /** Injected by the Cyfers host — do not ship your own SDK script. */
   const cyfers: _CyfersSdk;

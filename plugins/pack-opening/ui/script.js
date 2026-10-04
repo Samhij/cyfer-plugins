@@ -1248,7 +1248,7 @@
     els.refresh.disabled = state.loading;
   }
 
-  /* —— Persistence (cyfers.storage, per student) —— */
+  /* —— Persistence (cyfers.storage → host file under plugin-storage/, per student) —— */
 
   const seenKey = () => `seen:${state.studentId}`;
   const statsKey = () => `stats:${state.studentId}`;

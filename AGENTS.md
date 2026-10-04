@@ -142,7 +142,9 @@ await cyfers.storage.remove("key");
 
 - `getContext()` — school / student info; **never** tokens
 - `fetch(path, init?)` — only paths matching `permissions.api`; returns JSON or throws
-- `storage.*` — string key/value, isolated per plugin in the host
+- `storage.*` — string key/value, isolated per plugin; Cyfers persists each plugin’s
+  bag as a JSON file under `userData/data/plugin-storage/<plugin-id>.json` (survives
+  restarts; not browser `localStorage`)
 
 Allowlist globs: `*` matches one path segment (not `/`). Example:
 `/rest/v1/geldendvoortgangsdossierresultaten/leerling/*`

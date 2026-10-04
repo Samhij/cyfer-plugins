@@ -27,7 +27,12 @@ export type CyfersFetchInit = {
   body?: unknown;
 };
 
-/** Injected `window.cyfers` / global `cyfers` bridge. */
+/**
+ * Injected `window.cyfers` / global `cyfers` bridge.
+ *
+ * `storage` is a per-plugin string KV map persisted by the Cyfers host as a JSON
+ * file under the app userData directory (`plugin-storage/<plugin-id>.json`).
+ */
 export type CyfersSdk = {
   getContext(): Promise<CyfersContext>;
   fetch(path: string, init?: CyfersFetchInit): Promise<unknown>;

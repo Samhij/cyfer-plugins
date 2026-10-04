@@ -1859,8 +1859,21 @@
     return cards.slice().sort(byOvrDesc).reverse();
   }
 
-  /** Base duration for the grade count-up after a card flips (ms, before SPEED). */
-  const TICK_UP_MS = 2400;
+  /**
+   * Count-up length by rarity (ms, before SPEED). Lower tiers snap; high pulls linger.
+   * @param {GradeCard} card
+   */
+  function tickUpDuration(card) {
+    switch (card.tier) {
+      case "brons": return 1000;
+      case "zilver": return 1600;
+      case "goud": return 2400;
+      case "zeldzaam": return card.ovr >= 85 ? 3400 : 3000;
+      case "totw": return 3800;
+      case "icoon": return 4500;
+      default: return 2000;
+    }
+  }
 
   /**
    * Animate the rating number from 1,0 up to the real grade (cancellable via Phase).
@@ -1868,13 +1881,14 @@
    * @param {Phase} p
    * @param {HTMLElement} ratingEl
    * @param {GradeCard} card
-   * @param {number} [scale=1]
+   * @param {number} [pace=1] — e.g. slightly shorter on quick reveal
    */
-  async function tickUpRating(p, ratingEl, card, scale = 1) {
+  async function tickUpRating(p, ratingEl, card, pace = 1) {
     if (card.grade == null) return;
     let lastTick = 0;
     const target = card.grade;
-    await p.tween(TICK_UP_MS * scale, (t) => {
+    const ms = tickUpDuration(card) * pace;
+    await p.tween(ms, (t) => {
       const eased = 1 - Math.pow(1 - t, 3);
       ratingEl.textContent = formatGrade(1 + (target - 1) * eased);
       const now = performance.now();
@@ -2206,7 +2220,7 @@
     const cb = c.getBoundingClientRect();
     fx.burst({ x: cb.left + cb.width / 2, y: cb.top + cb.height / 2, count: 160 + hype * 40, colors: tier.particles, speed: 13 + hype, gravity: 0.1, life: 1500, size: 2.8 });
 
-    await tickUpRating(p, ratingEl, card, slow);
+    await tickUpRating(p, ratingEl, card);
     audio.chime(tier.rank);
 
     const callout = q(".wo-callout");

@@ -60,7 +60,8 @@ parent/
   cyfer-plugins/plugins/<your-id>/
 ```
 
-1. In `somtoday-login`, run `npm run dev` and sign in.
+1. From this repo run `npm run dev` (starts sibling `somtoday-login`), or run
+   `npm run dev` inside `somtoday-login`, then sign in.
 2. Open **Plugins** → section **Ontwikkeling**.
 3. Click **Laden** on your plugin (no zip).
 4. Edit files under `plugins/<id>/ui/` (and `manifest.json`); the host reloads the

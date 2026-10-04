@@ -10,7 +10,8 @@ Fork this repo, add your plugin under `plugins/`, and open a pull request. After
 2. Copy `plugins/voorbeeld-info` to `plugins/jouw-plugin`
 3. Edit `manifest.json` (`id` must be unique kebab-case)
 4. Build your UI under `ui/` (plain HTML/CSS/JS)
-5. Preview in Cyfers: host `npm run dev` → **Plugins → Ontwikkeling → Laden**
+5. Preview in Cyfers: from this repo run `npm run dev` (starts sibling
+   `somtoday-login`) → **Plugins → Ontwikkeling → Laden**
    (see [CONTRIBUTING.md](CONTRIBUTING.md)); no zip required while iterating
 6. Open a pull request
 

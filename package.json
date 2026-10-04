@@ -10,5 +10,8 @@
   },
   "files": [
     "types"
-  ]
+  ],
+  "scripts": {
+    "dev": "node scripts/run-host-dev.mjs"
+  }
 }

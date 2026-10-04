@@ -9,6 +9,10 @@
   --stage-ink: #f4f1ea;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
@@ -617,7 +621,7 @@ button.primary .tab-count:not(:empty) {
 .fc-tag {
   left: 0;
   right: 0;
-  bottom: 5.5%;
+  bottom: 7.5%;
   text-align: center;
   font-size: 4cqw;
   font-weight: 700;
@@ -626,9 +630,16 @@ button.primary .tab-count:not(:empty) {
   opacity: 0.75;
 }
 
+.fc-chip.is-exam {
+  border-color: transparent;
+  background: #1f3a8a;
+  color: #fff;
+  opacity: 1;
+}
+
 .fc-ribbon {
-  right: 4%;
-  top: 4%;
+  right: 9%;
+  top: 9.5%;
   z-index: 4;
   padding: 0.8cqw 2.4cqw;
   border-radius: 1.6cqw;
@@ -638,14 +649,6 @@ button.primary .tab-count:not(:empty) {
   font-weight: 700;
   letter-spacing: 0.08em;
   box-shadow: 0 1cqw 3cqw rgba(0, 0, 0, 0.3);
-}
-
-.fc-ribbon.is-exam {
-  right: auto;
-  left: 50%;
-  translate: -50% 0;
-  top: 3.5%;
-  background: #1f3a8a;
 }
 
 /* Tiers */

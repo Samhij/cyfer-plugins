@@ -55,14 +55,14 @@
   /** Hype level (see hypeOf) from which a card gets a full walkout. */
   const WALKOUT_HYPE = 4;
 
-  /** @type {Record<Tier, { label: string, rank: number, color: string, flash: string, particles: string[] }>} */
+  /** @type {Record<Tier, { label: string, tag: string, rank: number, color: string, flash: string, particles: string[] }>} */
   const TIERS = {
-    brons: { label: "Brons", rank: 0, color: "#d08a4e", flash: "#ffd9b8", particles: ["#f0b27a", "#c3824a", "#ffe0bf"] },
-    zilver: { label: "Zilver", rank: 1, color: "#dfe6ee", flash: "#f2f6fa", particles: ["#ffffff", "#c9d2db", "#9aa6b2"] },
-    goud: { label: "Goud", rank: 2, color: "#ffd54a", flash: "#fff0b8", particles: ["#fff3a6", "#ffd54a", "#e0a82e"] },
-    zeldzaam: { label: "Zeldzaam goud", rank: 3, color: "#ffc61a", flash: "#fff1a0", particles: ["#fff7c2", "#ffd23f", "#ff9f1a", "#ffffff"] },
-    totw: { label: "Toets van de Week", rank: 4, color: "#ff9f1a", flash: "#ffc56b", particles: ["#ffcf4a", "#ff8a00", "#ffffff", "#ffe08a"] },
-    icoon: { label: "Icoon", rank: 5, color: "#fff4cf", flash: "#ffffff", particles: ["#ffffff", "#fff1b8", "#ffd76a", "#9be7ff", "#ff9bd6"] },
+    brons: { label: "Brons", tag: "Brons", rank: 0, color: "#d08a4e", flash: "#ffd9b8", particles: ["#f0b27a", "#c3824a", "#ffe0bf"] },
+    zilver: { label: "Zilver", tag: "Zilver", rank: 1, color: "#dfe6ee", flash: "#f2f6fa", particles: ["#ffffff", "#c9d2db", "#9aa6b2"] },
+    goud: { label: "Goud", tag: "Goud", rank: 2, color: "#ffd54a", flash: "#fff0b8", particles: ["#fff3a6", "#ffd54a", "#e0a82e"] },
+    zeldzaam: { label: "Zeldzaam goud", tag: "Zeldzaam", rank: 3, color: "#ffc61a", flash: "#fff1a0", particles: ["#fff7c2", "#ffd23f", "#ff9f1a", "#ffffff"] },
+    totw: { label: "Toets van de Week", tag: "TOTW", rank: 4, color: "#ff9f1a", flash: "#ffc56b", particles: ["#ffcf4a", "#ff8a00", "#ffffff", "#ffe08a"] },
+    icoon: { label: "Icoon", tag: "Icoon", rank: 5, color: "#fff4cf", flash: "#ffffff", particles: ["#ffffff", "#fff1b8", "#ffd76a", "#9be7ff", "#ff9bd6"] },
   };
   /** @type {Tier[]} */
   const TIER_ORDER = ["icoon", "totw", "zeldzaam", "goud", "zilver", "brons"];
@@ -218,10 +218,10 @@
   function deriveAbbr(name) {
     const words = String(name).trim().split(/\s+/).filter(Boolean);
     if (!words.length) return "VAK";
-    let out = words[0].slice(0, 3);
     const tail = words.slice(1).find((w) => w.length <= 2);
-    if (tail) out += tail;
-    return out.toUpperCase();
+    if (tail) return (words[0].slice(0, 3) + tail).toUpperCase();
+    if (words.length > 1) return words.map((w) => w[0]).join("").slice(0, 3).toUpperCase();
+    return words[0].slice(0, 3).toUpperCase();
   }
 
   /** @param {SomtodayGrade} g */
@@ -996,19 +996,19 @@
       <div class="fc-inner">
         <div class="fc-face fc-front">
           <div class="fc-pattern"></div>
-          ${card.exam ? `<div class="fc-ribbon is-exam">EXAMEN</div>` : ""}
           ${ribbon}
           <div class="fc-left">
             <div class="fc-rating${rating.length > 3 ? " is-long" : ""}">${escapeHtml(rating)}</div>
             <div class="fc-pos">${escapeHtml(card.abbr)}</div>
             <div class="fc-chip">×${escapeHtml(card.weight ?? "–")}</div>
             ${card.period != null ? `<div class="fc-chip">P${escapeHtml(card.period)}</div>` : ""}
+            ${card.exam ? `<div class="fc-chip is-exam" title="Examendossier">EX</div>` : ""}
           </div>
           <div class="fc-portrait"><span class="fc-glyph${glyph.length > 2 ? " is-long" : ""}">${escapeHtml(glyph)}</span></div>
           <div class="fc-name">${escapeHtml(card.subject)}</div>
           <div class="fc-desc">${escapeHtml(card.description || card.kind)}</div>
           <div class="fc-stats">${stats}</div>
-          <div class="fc-tag">${escapeHtml(TIERS[card.tier].label)}</div>
+          <div class="fc-tag">${escapeHtml(TIERS[card.tier].tag)}</div>
           <div class="fc-shine"></div>
         </div>
         <div class="fc-face fc-back">
@@ -1336,6 +1336,7 @@
    *   newKeys: Set<string>,
    *   phase: Phase,
    *   step: "intro" | "reveal" | "board",
+   *   committed: boolean,
    *   opener: Element | null,
    * }} Run
    */
@@ -1379,6 +1380,7 @@
       newKeys: new Set(cards.filter((c) => !state.seen.has(c.key)).map((c) => c.key)),
       phase: new Phase(),
       step: "intro",
+      committed: false,
       opener: document.activeElement,
     };
     run = r;
@@ -1526,6 +1528,8 @@
     fx.burst({ x: b.left + b.width / 2, y: b.top + b.height * 0.15, count: 60 + hype * 25, colors: tier.particles, angle: -Math.PI / 2, spread: Math.PI * 0.8, speed: 9 + hype, gravity: 0.12, life: 1100 });
     await p.animate(pack, [{ transform: "scale(1)" }, { transform: "scale(1.08) translateY(-2%)" }], { duration: 420, easing: "ease-out" });
 
+    // Like FUT: once the pack is torn, its contents are yours even if you close early.
+    commitRun(r);
     els.stage.dataset.mood = r.best.tier;
     await flash(p, tier.flash, hype);
     els.stageContent.replaceChildren();
@@ -1744,6 +1748,8 @@
 
   /** @param {Run} r */
   function commitRun(r) {
+    if (r.committed) return;
+    r.committed = true;
     for (const c of r.cards) state.seen.add(c.key);
     state.stats.packs += 1;
     state.stats.walkouts += highlightsOf(r.cards).filter((c) => hypeOf(c) >= WALKOUT_HYPE).length;

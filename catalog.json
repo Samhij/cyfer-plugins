@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-04T10:38:12Z",
+  "updatedAt": "2026-10-04T10:53:16Z",
   "plugins": [
     {
       "id": "widget-cijfers",
@@ -65,7 +65,7 @@
     {
       "id": "pack-opening",
       "name": "Pack Opening",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "description": "Open packs met je Somtoday-cijfers: walkouts, zeldzaamheden en je eigen club",
       "author": "Sam Hijmans",
       "kind": "page",
@@ -77,7 +77,8 @@
       "permissions": {
         "api": [
           "/rest/v1/geldendvoortgangsdossierresultaten/leerling/*",
-          "/rest/v1/geldendexamendossierresultaten/leerling/*"
+          "/rest/v1/geldendexamendossierresultaten/leerling/*",
+          "/rest/v1/resultaatpublicatiemomenten/volgende/leerling/*"
         ]
       },
       "downloadUrl": "",

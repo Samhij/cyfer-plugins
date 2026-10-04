@@ -99,6 +99,7 @@
     app: $("app"),
     summary: $("summary"),
     status: $("status"),
+    countdown: $("countdown"),
     store: $("store"),
     club: $("club"),
     tabStore: /** @type {HTMLButtonElement} */ ($("tabStore")),
@@ -471,6 +472,16 @@
     vakChoice: "",
     sound: true,
     resetArmedUntil: 0,
+    /** @type {Date | null} */
+    momentAt: null,
+    momentLabel: "",
+    /** @type {"idle" | "loading" | "ready" | "empty" | "live" | "error"} */
+    momentStatus: "idle",
+    momentSeq: 0,
+    /** @type {number | null} */
+    countdownTimer: null,
+    /** After hitting zero, nudge grades once per moment. */
+    zeroHandledFor: "",
   };
 
   /* —— Audio (Web Audio synthesis, no files) —— */
@@ -1041,6 +1052,184 @@
     return el;
   }
 
+  /* —— Next resultaatpublicatiemoment countdown —— */
+
+  /**
+   * Pull a usable Date from the volgende-moment payload.
+   * Primary field: `datumTijd` (Somtoday convention). Fallbacks for related names.
+   * @param {unknown} raw
+   * @returns {{ at: Date | null, label: string }}
+   */
+  function parsePublicatieMoment(raw) {
+    if (raw == null || raw === "") return { at: null, label: "" };
+    if (typeof raw === "string") return { at: parseDate(raw), label: "" };
+    if (typeof raw !== "object") return { at: null, label: "" };
+    /** @type {Record<string, unknown>} */
+    const obj = /** @type {any} */ (raw);
+    if (Array.isArray(obj.items) && obj.items.length) return parsePublicatieMoment(obj.items[0]);
+    const label = typeof obj.naam === "string" ? obj.naam.trim() : "";
+    for (const key of ["datumTijd", "publicatieDatumTijd", "tijdstip", "beginDatumTijd", "datum"]) {
+      const at = parseDate(obj[key]);
+      if (at) return { at, label };
+    }
+    return { at: null, label };
+  }
+
+  /** @param {number} studentId */
+  async function fetchNextMoment(studentId) {
+    /** @type {SomtodayResultaatPublicatieMoment | null} */
+    const data = /** @type {any} */ (
+      await cyfers.fetch(`/rest/v1/resultaatpublicatiemomenten/volgende/leerling/${studentId}`)
+    );
+    return parsePublicatieMoment(data);
+  }
+
+  function stopCountdownTick() {
+    if (state.countdownTimer != null) {
+      clearInterval(state.countdownTimer);
+      state.countdownTimer = null;
+    }
+  }
+
+  function startCountdownTick() {
+    stopCountdownTick();
+    state.countdownTimer = window.setInterval(() => {
+      paintCountdown();
+    }, 1000);
+  }
+
+  function pad2(n) {
+    return String(Math.max(0, n)).padStart(2, "0");
+  }
+
+  /** @param {Date} at */
+  function formatMomentWhen(at) {
+    return at.toLocaleString("nl-NL", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  /**
+   * @param {number} totalMs
+   * @returns {{ days: number, hours: number, minutes: number, seconds: number }}
+   */
+  function splitRemaining(totalMs) {
+    const sec = Math.max(0, Math.floor(totalMs / 1000));
+    const days = Math.floor(sec / 86400);
+    const hours = Math.floor((sec % 86400) / 3600);
+    const minutes = Math.floor((sec % 3600) / 60);
+    const seconds = sec % 60;
+    return { days, hours, minutes, seconds };
+  }
+
+  function paintCountdown() {
+    const el = els.countdown;
+    const onStore = state.view === "store";
+    if (!onStore || state.momentStatus === "idle" || state.momentStatus === "loading") {
+      el.hidden = true;
+      return;
+    }
+
+    el.hidden = false;
+    el.classList.remove("is-urgent", "is-critical", "is-live", "is-empty");
+
+    if (state.momentStatus === "empty" || state.momentStatus === "error" || !state.momentAt) {
+      el.classList.add("is-empty");
+      el.innerHTML = `
+        <p class="reveal-cd-kicker">Cijferreveal</p>
+        <p class="reveal-cd-empty">Geen moment gepland</p>
+        <p class="reveal-cd-meta">Je school publiceert cijfers direct, of er staat nog geen publicatiemoment klaar.</p>`;
+      return;
+    }
+
+    const now = Date.now();
+    const target = state.momentAt.getTime();
+    const remaining = target - now;
+    const when = formatMomentWhen(state.momentAt);
+    const labelBit = state.momentLabel ? ` · ${escapeHtml(state.momentLabel)}` : "";
+
+    if (remaining <= 0) {
+      el.classList.add("is-live");
+      el.innerHTML = `
+        <p class="reveal-cd-kicker">Cijferreveal</p>
+        <p class="reveal-cd-empty">Nu — nieuwe cijfers kunnen binnenkomen</p>
+        <p class="reveal-cd-meta">Het publicatiemoment is bereikt${labelBit}. Packs vernieuwen…</p>`;
+      const key = state.momentAt.toISOString();
+      if (state.zeroHandledFor !== key) {
+        state.zeroHandledFor = key;
+        void onCountdownZero();
+      }
+      return;
+    }
+
+    const parts = splitRemaining(remaining);
+    if (remaining <= 60_000) el.classList.add("is-critical");
+    else if (remaining <= 3_600_000) el.classList.add("is-urgent");
+
+    const units = [
+      ["dagen", parts.days, parts.days > 0 || remaining >= 86400_000],
+      ["uur", parts.hours, true],
+      ["min", parts.minutes, true],
+      ["sec", parts.seconds, true],
+    ].filter(([, , show]) => show);
+
+    const digits = units
+      .map(([label, value], i) => {
+        const sep = i < units.length - 1 ? `<span class="reveal-cd-sep" aria-hidden="true">:</span>` : "";
+        return `<div class="reveal-cd-unit"><strong>${pad2(/** @type {number} */ (value))}</strong><span>${label}</span></div>${sep}`;
+      })
+      .join("");
+
+    el.innerHTML = `
+      <p class="reveal-cd-kicker">Volgende cijferreveal</p>
+      <div class="reveal-cd-digits" aria-label="${parts.days} dagen ${parts.hours} uur ${parts.minutes} minuten ${parts.seconds} seconden">${digits}</div>
+      <p class="reveal-cd-meta">Om <strong>${escapeHtml(when)}</strong>${labelBit}</p>`;
+  }
+
+  async function onCountdownZero() {
+    if (state.studentId == null) return;
+    await refreshMoment(state.studentId);
+    if (!run && !state.loading) await load();
+    setStatus("Publicatiemoment bereikt — nieuwe cijfers kunnen nu beschikbaar zijn.", "muted");
+  }
+
+  /** @param {number} studentId */
+  async function refreshMoment(studentId) {
+    const seq = ++state.momentSeq;
+    state.momentStatus = "loading";
+    paintCountdown();
+    try {
+      const { at, label } = await fetchNextMoment(studentId);
+      if (seq !== state.momentSeq) return;
+      state.momentAt = at;
+      state.momentLabel = label;
+      if (!at) {
+        state.momentStatus = "empty";
+        stopCountdownTick();
+      } else if (at.getTime() <= Date.now()) {
+        // Already past (e.g. just published) — show live UI without re-triggering grade reload.
+        state.momentStatus = "ready";
+        state.zeroHandledFor = at.toISOString();
+        startCountdownTick();
+      } else {
+        state.momentStatus = "ready";
+        state.zeroHandledFor = "";
+        startCountdownTick();
+      }
+    } catch {
+      if (seq !== state.momentSeq) return;
+      state.momentAt = null;
+      state.momentLabel = "";
+      state.momentStatus = "empty";
+      stopCountdownTick();
+    }
+    paintCountdown();
+  }
+
   /* —— Store —— */
 
   function packCards(pack) {
@@ -1231,6 +1420,7 @@
     els.tabClub.classList.toggle("primary", !store);
     els.tabStore.setAttribute("aria-selected", String(store));
     els.tabClub.setAttribute("aria-selected", String(!store));
+    paintCountdown();
     if (!store) renderClub();
   }
 
@@ -1301,7 +1491,10 @@
 
       const studentId = state.studentId;
       await loadPersisted();
-      const { cards, partial } = await loadCards(studentId);
+      const [{ cards, partial }] = await Promise.all([
+        loadCards(studentId),
+        refreshMoment(studentId),
+      ]);
       if (seq !== state.loadSeq) return;
       state.cards = cards;
       if (partial) setStatus("Niet alle cijfers konden worden geladen; je ziet een deel van je dossier.");
@@ -1313,6 +1506,7 @@
       if (seq === state.loadSeq) {
         state.loading = false;
         renderAll();
+        paintCountdown();
       }
     }
   }
@@ -2070,6 +2264,7 @@
       run.phase.abort("close");
       run = null;
     }
+    stopCountdownTick();
     fx.clear();
     audio.close();
   });

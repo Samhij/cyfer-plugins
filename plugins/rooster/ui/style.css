@@ -164,6 +164,7 @@
   border: 1px solid var(--line);
   border-left: 3px solid var(--accent);
   border-radius: 2px;
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .lesson-cancelled {
@@ -183,6 +184,48 @@
 
 .lesson-cancelled .lesson-meta {
   text-decoration: line-through;
+}
+
+.lesson-current {
+  z-index: 2;
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  border-left-color: var(--accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.lesson-current.lesson-cancelled {
+  z-index: 1;
+  background: color-mix(in srgb, var(--danger-bg) 55%, var(--bg-elevated));
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--line));
+  border-left-color: var(--danger);
+  box-shadow: none;
+}
+
+.now-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  height: 0;
+  border-top: 2px solid var(--danger);
+  pointer-events: none;
+  transform: translateY(-1px);
+}
+
+.now-line::before {
+  content: "";
+  position: absolute;
+  left: -3px;
+  top: -4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--danger);
+}
+
+.now-line[hidden] {
+  display: none;
 }
 
 .lesson-time {

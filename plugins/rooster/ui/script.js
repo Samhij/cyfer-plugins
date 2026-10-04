@@ -19,6 +19,8 @@ const DEFAULT_END_MIN = 16 * 60;
 const PX_PER_HOUR = 96;
 /** Minimum visible card height so short slots stay readable. */
 const MIN_CARD_PX = 48;
+/** Refresh the “nu” line / current-lesson highlight this often. */
+const NOW_TICK_MS = 60_000;
 
 const weekLabelEl = document.getElementById("weekLabel");
 const statusEl = document.getElementById("status");
@@ -32,6 +34,16 @@ let currentWeek = isoWeekParts(new Date());
 /** @type {number | null} */
 let studentId = null;
 let loadSeq = 0;
+/** @type {number} */
+let trackStartMin = DEFAULT_START_MIN;
+/** @type {number} */
+let trackEndMin = DEFAULT_END_MIN;
+/** @type {HTMLElement | null} */
+let nowLineEl = null;
+/** @type {HTMLUListElement | null} */
+let todayLessonsListEl = null;
+/** @type {number | null} */
+let nowTimer = null;
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -379,6 +391,15 @@ function appendHourLines(track, startMin, endMin) {
 }
 
 /**
+ * @param {number} nowMin
+ * @param {number} startMin
+ * @param {number} endMin
+ */
+function isLessonCurrent(nowMin, startMin, endMin) {
+  return nowMin >= startMin && nowMin < endMin;
+}
+
+/**
  * @param {LaidOutLesson} laid
  * @param {number} dayStartMin
  */
@@ -387,7 +408,12 @@ function renderLesson(laid, dayStartMin) {
   const cancelled = isLessonCancelled(item);
   const li = document.createElement("li");
   li.className = cancelled ? "lesson lesson-cancelled" : "lesson";
-  if (cancelled) li.setAttribute("aria-label", `${subjectOf(item)} — ${cancellationLabel(item)}`);
+  li.dataset.start = String(startMin);
+  li.dataset.end = String(endMin);
+  if (cancelled) {
+    li.dataset.cancelled = "1";
+    li.setAttribute("aria-label", `${subjectOf(item)} — ${cancellationLabel(item)}`);
+  }
 
   const top = ((startMin - dayStartMin) / 60) * PX_PER_HOUR;
   const rawHeight = ((endMin - startMin) / 60) * PX_PER_HOUR;
@@ -429,6 +455,45 @@ function renderLesson(laid, dayStartMin) {
   return li;
 }
 
+function updateNowIndicator() {
+  const now = new Date();
+  const nowMin = minutesFromMidnight(now);
+
+  if (todayLessonsListEl) {
+    for (const li of todayLessonsListEl.querySelectorAll(".lesson")) {
+      const el = /** @type {HTMLElement} */ (li);
+      const start = Number(el.dataset.start);
+      const end = Number(el.dataset.end);
+      const current = isLessonCurrent(nowMin, start, end);
+      el.classList.toggle("lesson-current", current);
+      // Keep cancelled styling across phase refreshes.
+      if (el.dataset.cancelled === "1") el.classList.add("lesson-cancelled");
+    }
+  }
+
+  if (!nowLineEl) return;
+
+  const inRange = nowMin >= trackStartMin && nowMin <= trackEndMin;
+  nowLineEl.hidden = !inRange;
+  if (inRange) {
+    nowLineEl.style.top = `${((nowMin - trackStartMin) / 60) * PX_PER_HOUR}px`;
+    nowLineEl.setAttribute("aria-label", `Nu ${formatTime(now)}`);
+  }
+}
+
+function stopNowTimer() {
+  if (nowTimer != null) {
+    clearInterval(nowTimer);
+    nowTimer = null;
+  }
+}
+
+function startNowTimer() {
+  stopNowTimer();
+  updateNowIndicator();
+  nowTimer = window.setInterval(updateNowIndicator, NOW_TICK_MS);
+}
+
 /**
  * @param {SomtodayAfspraakItem[]} items
  */
@@ -436,6 +501,7 @@ function renderSchedule(items) {
   const monday = mondayOfIsoWeek(currentWeek.year, currentWeek.week);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const viewingCurrentWeek = isSameWeek(currentWeek, isoWeekParts(today));
 
   /** @type {SomtodayAfspraakItem[][]} */
   const rawByDay = [[], [], [], [], []];
@@ -450,11 +516,16 @@ function renderSchedule(items) {
 
   /** @type {LaidOutLesson[][]} */
   const byDay = rawByDay.map((dayItems) => layoutOverlappingLessons(dayItems));
-  const { startMin, endMin } = timelineBounds(byDay);
-  const trackHeight = ((endMin - startMin) / 60) * PX_PER_HOUR;
+  const bounds = timelineBounds(byDay);
+  trackStartMin = bounds.startMin;
+  trackEndMin = bounds.endMin;
+  const trackHeight = ((trackEndMin - trackStartMin) / 60) * PX_PER_HOUR;
 
   scheduleEl.replaceChildren();
   scheduleEl.style.setProperty("--track-height", `${trackHeight}px`);
+  nowLineEl = null;
+  todayLessonsListEl = null;
+  stopNowTimer();
 
   const scroll = document.createElement("div");
   scroll.className = "schedule-scroll";
@@ -470,7 +541,7 @@ function renderSchedule(items) {
   const axisWrap = document.createElement("div");
   axisWrap.className = "hours-axis-wrap";
   axisWrap.style.height = `${trackHeight}px`;
-  axisWrap.appendChild(renderHoursAxis(startMin, endMin));
+  axisWrap.appendChild(renderHoursAxis(trackStartMin, trackEndMin));
   gutter.appendChild(axisWrap);
   body.appendChild(gutter);
 
@@ -479,11 +550,12 @@ function renderSchedule(items) {
   daysEl.id = "days";
 
   let total = 0;
+  let showNowIndicator = false;
 
   for (let i = 0; i < 5; i += 1) {
     const dayDate = new Date(monday);
     dayDate.setDate(monday.getDate() + i);
-    const isToday = dayDate.getTime() === today.getTime();
+    const isToday = viewingCurrentWeek && dayDate.getTime() === today.getTime();
     const dayItems = byDay[i];
     total += dayItems.length;
 
@@ -498,7 +570,7 @@ function renderSchedule(items) {
     const track = document.createElement("div");
     track.className = "day-track";
     track.style.height = `${trackHeight}px`;
-    appendHourLines(track, startMin, endMin);
+    appendHourLines(track, trackStartMin, trackEndMin);
 
     if (dayItems.length === 0) {
       const empty = document.createElement("p");
@@ -509,9 +581,19 @@ function renderSchedule(items) {
       const list = document.createElement("ul");
       list.className = "lessons";
       for (const laid of dayItems) {
-        list.appendChild(renderLesson(laid, startMin));
+        list.appendChild(renderLesson(laid, trackStartMin));
       }
       track.appendChild(list);
+      if (isToday) todayLessonsListEl = list;
+    }
+
+    if (isToday) {
+      const nowLine = document.createElement("div");
+      nowLine.className = "now-line";
+      nowLine.setAttribute("role", "presentation");
+      track.appendChild(nowLine);
+      nowLineEl = nowLine;
+      showNowIndicator = true;
     }
 
     section.appendChild(track);
@@ -521,6 +603,8 @@ function renderSchedule(items) {
   body.appendChild(daysEl);
   scroll.appendChild(body);
   scheduleEl.appendChild(scroll);
+
+  if (showNowIndicator) startNowTimer();
 
   if (total === 0) {
     setStatus("empty", "Geen lessen deze week.");
@@ -535,6 +619,9 @@ async function loadWeek() {
   setNavEnabled(false);
   setStatus("muted", "Laden…");
   scheduleEl.replaceChildren();
+  stopNowTimer();
+  nowLineEl = null;
+  todayLessonsListEl = null;
 
   if (!studentId) {
     setStatus("error", "Geen leerling gevonden in de sessie.");
@@ -555,6 +642,9 @@ async function loadWeek() {
     const message = error instanceof Error ? error.message : "Laden mislukt.";
     setStatus("error", message);
     scheduleEl.replaceChildren();
+    stopNowTimer();
+    nowLineEl = null;
+    todayLessonsListEl = null;
   } finally {
     if (seq === loadSeq) setNavEnabled(true);
   }

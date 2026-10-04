@@ -841,6 +841,11 @@ body {
   animation: shine-sweep 1s ease 0.4s;
 }
 
+/* Stable face-up after flip — do not stack with is-flipping */
+.grade-card.is-face-up {
+  transform: rotateY(180deg);
+}
+
 .grade-card.is-hero {
   animation: card-hero-hold 2.4s ease-in-out infinite;
   filter: drop-shadow(0 0 28px var(--tier-glow));
@@ -893,6 +898,10 @@ body {
   --card-h: 13.2rem;
   width: 100%;
   height: var(--card-h);
+  /* Compact board: front is shown directly — never rotateY the root */
+  transform: none !important;
+  animation: none !important;
+  filter: none;
 }
 
 .gallery-grid .face-back {
@@ -901,6 +910,7 @@ body {
 
 .gallery-grid .face-front {
   transform: none;
+  backface-visibility: visible;
 }
 
 .gallery-grid .card-score-hero {
@@ -1116,7 +1126,8 @@ body {
   }
 
   .grade-card.is-flipping,
-  .grade-card.is-hero {
+  .grade-card.is-hero,
+  .grade-card.is-face-up {
     transform: rotateY(180deg);
   }
 

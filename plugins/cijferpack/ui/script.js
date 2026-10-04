@@ -5,6 +5,12 @@
  *   GET /rest/v1/geldendvoortgangsdossierresultaten/leerling/{id}
  *   GET /rest/v1/geldendexamendossierresultaten/leerling/{id}
  * with Range items=0-99 (up to 100 per endpoint; combined for the pack).
+ *
+ * Sequencing rules (hardened):
+ * - Single-flight open / replay (no re-entrancy)
+ * - One AbortController covers shake → reveals → continue waits
+ * - All delays are abortable; already-aborted signals reject immediately
+ * - hardReset() clears DOM classes, particles, RAF, and pending continue
  */
 
 const QUERY = [
@@ -45,19 +51,32 @@ const TIMING = {
   autoAdvanceBronze: 450,
   autoAdvanceSilver: 650,
   autoAdvanceGold: 900,
+  /** Reduced-motion: still paint each step, never zero-length. */
+  reducedStep: 160,
+  reducedContinue: 280,
+  /** Absolute safety so requireTap can never hang forever. */
+  continueSafetyMax: 45000,
 };
+
+/** @typedef {"idle" | "opening" | "revealing" | "gallery"} Phase */
 
 /** @type {PackCard[]} */
 let packCards = [];
+/** @type {Phase} */
+let phase = "idle";
 /** @type {AbortController | null} */
-let revealAbort = null;
-/** @type {(() => void) | null} */
-let continueResolve = null;
+let runAbort = null;
+/** @type {ContinueGate | null} */
+let continueGate = null;
 let prefersReducedMotion = false;
+/** @type {MediaQueryList | null} */
+let motionQuery = null;
 /** @type {number | null} */
 let fxRaf = null;
 /** @type {{ x: number, y: number, vx: number, vy: number, life: number, color: string, size: number }[]} */
 let particles = [];
+/** Generation bump cancels stale async tails after reset. */
+let runGeneration = 0;
 
 const el = {
   theater: /** @type {HTMLElement} */ (document.getElementById("theater")),
@@ -99,6 +118,117 @@ const ctx2d = el.canvas.getContext("2d");
  * }} PackCard
  */
 
+/** Abortable continue / auto-advance waiter (single active gate). */
+class ContinueGate {
+  constructor() {
+    /** @type {(() => void) | null} */
+    this._resolve = null;
+    /** @type {((reason?: unknown) => void) | null} */
+    this._reject = null;
+    /** @type {ReturnType<typeof setTimeout> | null} */
+    this._timer = null;
+    /** @type {(() => void) | null} */
+    this._onTap = null;
+    /** @type {(() => void) | null} */
+    this._onAbort = null;
+    /** @type {AbortSignal | null} */
+    this._signal = null;
+    this._settled = true;
+  }
+
+  get pending() {
+    return !this._settled;
+  }
+
+  /** Cancel without resolving — rejects waiters so awaiters cannot hang. */
+  clear() {
+    if (!this._settled) {
+      const rej = this._reject;
+      this._teardown(false);
+      rej?.(new DOMException("Aborted", "AbortError"));
+      return;
+    }
+    this._teardown(false);
+  }
+
+  /** Resolve if waiting (advance). */
+  dismiss() {
+    if (this._settled) return;
+    const resolve = this._resolve;
+    this._teardown(false);
+    resolve?.();
+  }
+
+  /**
+   * @param {number} autoMs
+   * @param {boolean} requireTap
+   * @param {AbortSignal} signal
+   */
+  wait(autoMs, requireTap, signal) {
+    this.clear();
+    this._settled = false;
+    this._signal = signal;
+
+    return new Promise((resolve, reject) => {
+      if (signal.aborted) {
+        this._settled = true;
+        reject(new DOMException("Aborted", "AbortError"));
+        return;
+      }
+
+      this._resolve = resolve;
+      this._reject = reject;
+
+      this._onTap = () => this.dismiss();
+      this._onAbort = () => {
+        if (this._settled) return;
+        const rej = this._reject;
+        this._teardown(false);
+        rej?.(new DOMException("Aborted", "AbortError"));
+      };
+
+      el.continueBtn.hidden = false;
+      el.continueBtn.disabled = false;
+      try {
+        el.continueBtn.focus({ preventScroll: true });
+      } catch {
+        /* focus can fail if panel not visible yet */
+      }
+      el.continueBtn.addEventListener("click", this._onTap);
+      signal.addEventListener("abort", this._onAbort, { once: true });
+
+      const ms = requireTap
+        ? TIMING.continueSafetyMax
+        : Math.max(0, autoMs);
+      this._timer = setTimeout(() => this.dismiss(), ms);
+    });
+  }
+
+  /**
+   * @param {boolean} _unused
+   */
+  _teardown(_unused) {
+    if (this._timer != null) {
+      clearTimeout(this._timer);
+      this._timer = null;
+    }
+    if (this._onTap) {
+      el.continueBtn.removeEventListener("click", this._onTap);
+      this._onTap = null;
+    }
+    if (this._onAbort && this._signal) {
+      this._signal.removeEventListener("abort", this._onAbort);
+      this._onAbort = null;
+    }
+    this._signal = null;
+    this._resolve = null;
+    this._reject = null;
+    this._settled = true;
+    el.continueBtn.hidden = true;
+    el.continueBtn.disabled = false;
+  }
+}
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -107,20 +237,43 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;");
 }
 
-function sleep(ms, signal) {
-  if (prefersReducedMotion) return Promise.resolve();
+/**
+ * Always waits (abortable). Use for reduced-motion short steps too.
+ * @param {number} ms
+ * @param {AbortSignal} [signal]
+ */
+function delay(ms, signal) {
   return new Promise((resolve, reject) => {
-    const t = setTimeout(resolve, ms);
-    if (!signal) return;
-    signal.addEventListener(
-      "abort",
-      () => {
-        clearTimeout(t);
-        reject(new DOMException("Aborted", "AbortError"));
-      },
-      { once: true },
-    );
+    if (signal?.aborted) {
+      reject(new DOMException("Aborted", "AbortError"));
+      return;
+    }
+    const t = setTimeout(() => {
+      if (signal) signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, Math.max(0, ms));
+    const onAbort = () => {
+      clearTimeout(t);
+      reject(new DOMException("Aborted", "AbortError"));
+    };
+    if (signal) signal.addEventListener("abort", onAbort, { once: true });
   });
+}
+
+/**
+ * Drama sleep: full timing, or a short real delay under reduced motion.
+ * @param {number} ms
+ * @param {AbortSignal} [signal]
+ */
+function sleep(ms, signal) {
+  if (prefersReducedMotion) {
+    return delay(Math.min(ms, TIMING.reducedStep), signal);
+  }
+  return delay(ms, signal);
+}
+
+function isAbortError(err) {
+  return err instanceof DOMException && err.name === "AbortError";
 }
 
 function setStatus(message, isError = false) {
@@ -288,7 +441,9 @@ function numericOf(score) {
 function dateOf(grade) {
   const raw = grade.datumInvoer || grade.datumInvoerEerstePoging || grade.datumInvoerTweedePoging;
   if (!raw) return "—";
-  return new Date(raw).toLocaleDateString("nl-NL", {
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("nl-NL", {
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -376,13 +531,42 @@ function toCard(grade, source) {
   if (!score) return null;
   const numeric = numericOf(score);
   return {
-    subject: subjectOf(grade),
+    subject: subjectOf(grade) || "Vak",
     score,
     numeric,
     date: dateOf(grade),
     teacher: teacherOf(grade),
     source,
     tier: tierOf(score, numeric, grade),
+  };
+}
+
+/**
+ * Normalize a card before render — never throw on partial data.
+ * @param {Partial<PackCard> | null | undefined} card
+ * @returns {PackCard | null}
+ */
+function normalizeCard(card) {
+  if (!card || typeof card !== "object") return null;
+  const score = card.score != null && String(card.score).trim() ? String(card.score) : null;
+  if (!score) return null;
+  const tier =
+    card.tier === "bronze" ||
+    card.tier === "silver" ||
+    card.tier === "gold" ||
+    card.tier === "special"
+      ? card.tier
+      : "silver";
+  const numeric =
+    typeof card.numeric === "number" && Number.isFinite(card.numeric) ? card.numeric : null;
+  return {
+    subject: card.subject && String(card.subject).trim() ? String(card.subject) : "Vak",
+    score,
+    numeric,
+    date: card.date && String(card.date).trim() ? String(card.date) : "—",
+    teacher: card.teacher && String(card.teacher).trim() ? String(card.teacher) : null,
+    source: card.source === "examen" ? "examen" : "voortgang",
+    tier,
   };
 }
 
@@ -409,7 +593,6 @@ function dramatizeOrder(cards) {
   const highs = shuffled.filter((c) => c.tier === "gold" || c.tier === "special");
   const rest = shuffled.filter((c) => c.tier !== "gold" && c.tier !== "special");
   if (!highs.length) return shuffled;
-  // Sprinkle: most commons first, finish with highs
   const early = rest.slice(0, Math.max(0, rest.length - 1));
   const mid = rest.slice(Math.max(0, rest.length - 1));
   return [...shuffle(early), ...shuffle(mid), ...shuffle(highs)];
@@ -430,44 +613,73 @@ async function loadGrades(kind, studentId) {
 
 /**
  * @param {PackCard} card
- * @param {{ revealed?: boolean, compact?: boolean }} [opts]
+ * @param {{ faceUp?: boolean, compact?: boolean }} [opts]
  */
 function buildCardElement(card, opts = {}) {
-  const root = document.createElement("article");
-  root.className = `grade-card tier-${card.tier}`;
-  root.setAttribute("aria-label", `${card.subject}: ${card.score}`);
+  const safe = normalizeCard(card);
+  if (!safe) {
+    const empty = document.createElement("article");
+    empty.className = "grade-card tier-bronze";
+    empty.innerHTML = `<div class="face face-front"><p class="card-meta">—</p></div>`;
+    return empty;
+  }
 
-  const teacherLine = card.teacher
-    ? `<p class="card-meta">${escapeHtml(card.teacher)}</p>`
+  const root = document.createElement("article");
+  root.className = `grade-card tier-${safe.tier}`;
+  root.setAttribute("aria-label", `${safe.subject}: ${safe.score}`);
+
+  const teacherLine = safe.teacher
+    ? `<p class="card-meta">${escapeHtml(safe.teacher)}</p>`
     : "";
-  const sourceLabel = card.source === "examen" ? "Examen" : "Voortgang";
+  const sourceLabel = safe.source === "examen" ? "Examen" : "Voortgang";
+  const tierLabel = TIER_LABELS[safe.tier] || "Kaart";
 
   root.innerHTML = `
     <div class="face face-back" aria-hidden="true"></div>
     <div class="face face-front">
       <div class="card-rating-block">
-        <div class="card-rating">${escapeHtml(ratingOf(card))}</div>
+        <div class="card-rating">${escapeHtml(ratingOf(safe))}</div>
         <div class="card-chem">
-          <span class="card-tier">${TIER_LABELS[card.tier]}</span>
+          <span class="card-tier">${escapeHtml(tierLabel)}</span>
           <span class="card-source-pill">${sourceLabel}</span>
         </div>
       </div>
       <div class="card-portrait">
-        <div class="card-score-hero">${escapeHtml(card.score)}</div>
+        <div class="card-score-hero">${escapeHtml(safe.score)}</div>
       </div>
       <div class="card-footer">
-        <h3 class="card-subject">${escapeHtml(card.subject)}</h3>
-        <p class="card-meta">${escapeHtml(card.date)}</p>
+        <h3 class="card-subject">${escapeHtml(safe.subject)}</h3>
+        <p class="card-meta">${escapeHtml(safe.date)}</p>
         ${teacherLine}
       </div>
       <div class="card-shine" aria-hidden="true"></div>
     </div>
   `;
 
-  if (opts.revealed || opts.compact) {
-    root.style.transform = "rotateY(180deg)";
+  // Gallery uses CSS (face-back hidden, face-front unrotated) — never rotateY the root
+  // or the front face disappears while the back is display:none.
+  if (opts.faceUp && !opts.compact) {
+    root.classList.add("is-face-up");
   }
   return root;
+}
+
+/**
+ * Strip transient animation classes so the next state starts clean.
+ * @param {HTMLElement} node
+ */
+function clearCardMotion(node) {
+  node.classList.remove(
+    "is-enter",
+    "is-walkout",
+    "is-await",
+    "is-flipping",
+    "is-hero",
+    "is-face-up",
+  );
+  node.style.removeProperty("transform");
+  node.style.removeProperty("opacity");
+  node.style.removeProperty("filter");
 }
 
 /**
@@ -483,68 +695,53 @@ function showStage(name) {
   el.theater.classList.toggle("phase-gallery", name === "gallery");
 }
 
-function hideContinue() {
-  el.continueBtn.hidden = true;
-  if (continueResolve) {
-    const r = continueResolve;
-    continueResolve = null;
-    r();
-  }
+function setIntroControlsEnabled(enabled) {
+  const on = Boolean(enabled) && packCards.length > 0;
+  el.openBtn.disabled = !on;
+  el.pack.disabled = !on;
 }
 
 /**
- * Wait for continue tap, or auto-advance after ms (unless requireTap).
- * @param {number} autoMs
- * @param {boolean} requireTap
- * @param {AbortSignal} signal
+ * Full cleanup: abort run, kill timers/RAF/particles, reset DOM chrome.
+ * @param {{ keepPhase?: Phase }} [opts]
  */
-function waitContinue(autoMs, requireTap, signal) {
-  if (prefersReducedMotion) return Promise.resolve();
-
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    /** @type {ReturnType<typeof setTimeout> | null} */
-    let timer = null;
-
-    const finish = () => {
-      if (settled) return;
-      settled = true;
-      continueResolve = null;
-      el.continueBtn.hidden = true;
-      el.continueBtn.removeEventListener("click", onTap);
-      signal.removeEventListener("abort", onAbort);
-      if (timer != null) clearTimeout(timer);
-      resolve();
-    };
-
-    const onAbort = () => {
-      if (settled) return;
-      settled = true;
-      continueResolve = null;
-      el.continueBtn.hidden = true;
-      el.continueBtn.removeEventListener("click", onTap);
-      if (timer != null) clearTimeout(timer);
-      reject(new DOMException("Aborted", "AbortError"));
-    };
-
-    const onTap = () => finish();
-
-    continueResolve = finish;
-    el.continueBtn.hidden = false;
-    el.continueBtn.focus({ preventScroll: true });
-    el.continueBtn.addEventListener("click", onTap);
-    signal.addEventListener("abort", onAbort, { once: true });
-
-    if (!requireTap) {
-      timer = setTimeout(finish, autoMs);
+function hardReset(opts = {}) {
+  runGeneration += 1;
+  if (runAbort) {
+    try {
+      runAbort.abort();
+    } catch {
+      /* ignore */
     }
-  });
+  }
+  runAbort = null;
+  continueGate?.clear();
+  continueGate = null;
+
+  stopFxLoop();
+  clearBeams();
+  el.theater.classList.remove("is-shaking", "is-shaking-hard");
+  el.pack.classList.remove("is-shake-soft", "is-shake-mid", "is-shake-hard", "is-burst");
+  el.flash.classList.remove("is-on");
+  el.chromatic.classList.remove("is-on");
+  el.revealHost.replaceChildren();
+  el.revealProgress.textContent = "";
+  el.continueBtn.hidden = true;
+  el.continueBtn.disabled = false;
+  el.continueBtn.textContent = "Tik om door te gaan";
+  el.skipBtn.hidden = true;
+
+  if (opts.keepPhase) {
+    phase = opts.keepPhase;
+  }
 }
 
 function renderGallery() {
   el.galleryGrid.replaceChildren();
   const counts = { special: 0, gold: 0, silver: 0, bronze: 0 };
-  for (const card of packCards) {
+  for (const raw of packCards) {
+    const card = normalizeCard(raw);
+    if (!card) continue;
     counts[card.tier] += 1;
     el.galleryGrid.appendChild(buildCardElement(card, { compact: true }));
   }
@@ -554,26 +751,55 @@ function renderGallery() {
 }
 
 /**
+ * @param {number} autoMs
+ * @param {boolean} requireTap
+ * @param {AbortSignal} signal
+ */
+async function waitContinue(autoMs, requireTap, signal) {
+  if (!continueGate) continueGate = new ContinueGate();
+
+  if (prefersReducedMotion) {
+    el.continueBtn.textContent = el.continueBtn.textContent || "Tik om door te gaan";
+    await continueGate.wait(TIMING.reducedContinue, false, signal);
+    return;
+  }
+
+  await continueGate.wait(autoMs, requireTap, signal);
+}
+
+/**
  * @param {PackCard} card
  * @param {number} index
  * @param {AbortSignal} signal
+ * @param {number} generation
  */
-async function revealOne(card, index, signal) {
+async function revealOne(card, index, signal, generation) {
+  if (signal.aborted || generation !== runGeneration) {
+    throw new DOMException("Aborted", "AbortError");
+  }
+
+  const safe = normalizeCard(card);
+  if (!safe) return;
+
   el.revealHost.replaceChildren();
   clearBeams();
-  hideContinue();
+  continueGate?.clear();
 
-  const node = buildCardElement(card);
+  const node = buildCardElement(safe);
   el.revealHost.appendChild(node);
   el.revealProgress.textContent = `Kaart ${index + 1} van ${packCards.length}`;
 
-  const intense = card.tier === "gold" || card.tier === "special";
-  const walkout = card.tier === "special";
+  const intense = safe.tier === "gold" || safe.tier === "special";
+  const walkout = safe.tier === "special";
+
+  el.continueBtn.textContent =
+    index === packCards.length - 1 ? "Naar overzicht" : "Tik om door te gaan";
 
   if (prefersReducedMotion) {
-    armRarityFx(card.tier);
-    node.style.transform = "rotateY(180deg)";
-    await waitContinue(200, false, signal);
+    armRarityFx(safe.tier);
+    clearCardMotion(node);
+    node.classList.add("is-face-up");
+    await waitContinue(TIMING.reducedContinue, false, signal);
     return;
   }
 
@@ -590,148 +816,175 @@ async function revealOne(card, index, signal) {
   }
 
   await sleep(walkout ? 900 : 420, signal);
+  if (generation !== runGeneration) throw new DOMException("Aborted", "AbortError");
 
   // Beat pause before flip — the FIFA "is it…?" moment
   if (intense) {
-    armRarityFx(card.tier);
+    armRarityFx(safe.tier);
+    node.classList.remove("is-enter", "is-walkout");
+    void node.offsetWidth;
     node.classList.add("is-await");
-    spawnBurst(card.tier === "special" ? 40 : 24, card.tier === "special" ? "special" : "gold");
-    const beat = card.tier === "special" ? TIMING.specialBeat : TIMING.goldBeat;
+    spawnBurst(safe.tier === "special" ? 40 : 24, safe.tier === "special" ? "special" : "gold");
+    const beat = safe.tier === "special" ? TIMING.specialBeat : TIMING.goldBeat;
     await sleep(beat, signal);
     node.classList.remove("is-await");
-  } else if (card.tier === "silver") {
-    el.beams.classList.add("is-on");
+  } else if (safe.tier === "silver") {
+    el.beams.className = "beams is-on tier-silver";
     await sleep(220, signal);
   }
 
-  // Flip
-  node.classList.remove("is-enter", "is-walkout");
+  if (generation !== runGeneration) throw new DOMException("Aborted", "AbortError");
+
+  // Flip — one animation at a time (no stacked is-flipping + is-hero)
+  clearCardMotion(node);
   void node.offsetWidth;
   node.classList.add("is-flipping");
   if (intense) {
-    triggerFlash(card.tier === "special");
-    spawnBurst(card.tier === "special" ? 48 : 28, card.tier === "special" ? "special" : "gold");
-    setTheaterShake(card.tier === "special" ? "hard" : "soft");
+    triggerFlash(safe.tier === "special");
+    spawnBurst(safe.tier === "special" ? 48 : 28, safe.tier === "special" ? "special" : "gold");
+    setTheaterShake(safe.tier === "special" ? "hard" : "soft");
   } else {
     spawnBurst(12, "sparks");
   }
 
   await sleep(850, signal);
-  node.classList.add("is-hero");
+  if (generation !== runGeneration) throw new DOMException("Aborted", "AbortError");
+
+  // Lock face-up with a stable class (animation fill-mode can't fight the next keyframes)
+  clearCardMotion(node);
+  node.classList.add("is-face-up", "is-hero");
 
   const hold =
-    card.tier === "special"
+    safe.tier === "special"
       ? TIMING.specialHold
-      : card.tier === "gold"
+      : safe.tier === "gold"
         ? TIMING.goldHold
-        : card.tier === "silver"
+        : safe.tier === "silver"
           ? TIMING.silverHold
           : TIMING.bronzeHold;
 
   await sleep(Math.min(hold, 600), signal);
 
-  const requireTap = card.tier === "special" || card.tier === "gold";
+  const requireTap = safe.tier === "special" || safe.tier === "gold";
   const auto =
-    card.tier === "special"
+    safe.tier === "special"
       ? TIMING.autoAdvanceGold + 800
-      : card.tier === "gold"
+      : safe.tier === "gold"
         ? TIMING.autoAdvanceGold
-        : card.tier === "silver"
+        : safe.tier === "silver"
           ? TIMING.autoAdvanceSilver
           : TIMING.autoAdvanceBronze;
 
-  el.continueBtn.textContent =
-    index === packCards.length - 1 ? "Naar overzicht" : "Tik om door te gaan";
   await waitContinue(auto, requireTap, signal);
 }
 
 /**
  * @param {AbortSignal} signal
+ * @param {number} generation
  */
-async function runRevealSequence(signal) {
+async function runRevealSequence(signal, generation) {
+  phase = "revealing";
   showStage("reveal");
   el.skipBtn.hidden = false;
   el.pack.classList.remove("is-shake-soft", "is-shake-mid", "is-shake-hard", "is-burst");
 
   for (let i = 0; i < packCards.length; i += 1) {
-    if (signal.aborted) throw new DOMException("Aborted", "AbortError");
-    await revealOne(packCards[i], i, signal);
+    if (signal.aborted || generation !== runGeneration) {
+      throw new DOMException("Aborted", "AbortError");
+    }
+    await revealOne(packCards[i], i, signal, generation);
   }
 
-  finishToGallery();
+  finishToGallery(generation);
 }
 
-function finishToGallery() {
-  revealAbort = null;
-  hideContinue();
+/**
+ * @param {number} [generation]
+ */
+function finishToGallery(generation) {
+  if (generation != null && generation !== runGeneration) return;
+
+  continueGate?.clear();
+  continueGate = null;
+  runAbort = null;
   el.skipBtn.hidden = true;
   clearBeams();
   stopFxLoop();
   el.theater.classList.remove("is-shaking", "is-shaking-hard");
+  el.flash.classList.remove("is-on");
+  el.chromatic.classList.remove("is-on");
+  el.revealHost.replaceChildren();
   renderGallery();
   showStage("gallery");
+  phase = "gallery";
   el.subtitle.textContent = `${packCards.length} cijfers geopend`;
+  setIntroControlsEnabled(false);
 }
 
 async function openPack() {
-  if (!packCards.length) return;
+  // Single-flight: ignore mash-clicks / dual pack+CTA activation
+  if (phase !== "idle" || !packCards.length) return;
 
-  el.openBtn.disabled = true;
-  el.pack.disabled = true;
+  phase = "opening";
+  setIntroControlsEnabled(false);
+  setStatus("");
   el.introTagline.textContent = "Pakket trilt…";
 
-  if (!prefersReducedMotion) {
-    el.pack.classList.add("is-shake-soft");
-    spawnBurst(16, "sparks");
-    await sleep(TIMING.shakeSoft);
-    el.pack.classList.remove("is-shake-soft");
-    el.pack.classList.add("is-shake-mid");
-    setTheaterShake("soft");
-    spawnBurst(28, "burst");
-    await sleep(TIMING.shakeMid);
-    el.pack.classList.remove("is-shake-mid");
-    el.pack.classList.add("is-shake-hard");
-    setTheaterShake("hard");
-    spawnBurst(40, "gold");
-    el.introTagline.textContent = "OPEN!";
-    await sleep(TIMING.shakeHard);
-    el.pack.classList.remove("is-shake-hard");
-    el.pack.classList.add("is-burst");
-    triggerFlash(true);
-    spawnBurst(70, "special");
-    await sleep(TIMING.burstHold);
-  } else {
-    el.pack.classList.add("is-burst");
-  }
+  const generation = runGeneration + 1;
+  runGeneration = generation;
+  const ac = new AbortController();
+  runAbort = ac;
+  const { signal } = ac;
+  continueGate = new ContinueGate();
 
-  revealAbort?.abort();
-  revealAbort = new AbortController();
   try {
-    await runRevealSequence(revealAbort.signal);
+    if (!prefersReducedMotion) {
+      el.pack.classList.add("is-shake-soft");
+      spawnBurst(16, "sparks");
+      await sleep(TIMING.shakeSoft, signal);
+      el.pack.classList.remove("is-shake-soft");
+      el.pack.classList.add("is-shake-mid");
+      setTheaterShake("soft");
+      spawnBurst(28, "burst");
+      await sleep(TIMING.shakeMid, signal);
+      el.pack.classList.remove("is-shake-mid");
+      el.pack.classList.add("is-shake-hard");
+      setTheaterShake("hard");
+      spawnBurst(40, "gold");
+      el.introTagline.textContent = "OPEN!";
+      await sleep(TIMING.shakeHard, signal);
+      el.pack.classList.remove("is-shake-hard");
+      el.pack.classList.add("is-burst");
+      triggerFlash(true);
+      spawnBurst(70, "special");
+      await sleep(TIMING.burstHold, signal);
+    } else {
+      el.pack.classList.add("is-burst");
+      await delay(TIMING.reducedStep, signal);
+    }
+
+    if (generation !== runGeneration) return;
+    await runRevealSequence(signal, generation);
   } catch (err) {
-    if (err instanceof DOMException && err.name === "AbortError") {
-      finishToGallery();
+    if (isAbortError(err)) {
+      // Skip / hardReset / Herladen — land on board if we still own this run
+      if (generation === runGeneration && phase !== "idle") {
+        finishToGallery(generation);
+      }
       return;
     }
-    throw err;
+    const message = err instanceof Error ? err.message : "Openen mislukt.";
+    setStatus(message, true);
+    resetToIntro();
   }
 }
 
 function resetToIntro() {
-  revealAbort?.abort();
-  revealAbort = null;
-  hideContinue();
-  clearBeams();
-  stopFxLoop();
-  el.theater.classList.remove("is-shaking", "is-shaking-hard");
-  el.pack.classList.remove("is-shake-soft", "is-shake-mid", "is-shake-hard", "is-burst");
-  el.flash.classList.remove("is-on");
-  el.chromatic.classList.remove("is-on");
-  el.revealHost.replaceChildren();
+  hardReset();
   showStage("intro");
+  phase = "idle";
   const ready = packCards.length > 0;
-  el.openBtn.disabled = !ready;
-  el.pack.disabled = !ready;
+  setIntroControlsEnabled(ready);
   el.subtitle.textContent = ready
     ? `${packCards.length} cijfers klaar om te trekken`
     : "Geen cijfers gevonden";
@@ -740,39 +993,87 @@ function resetToIntro() {
     packCards.length === 1 ? "1 kaart" : `${packCards.length} kaarten`;
 }
 
+function replayPack() {
+  // Only from end board; abort any stray work then reshuffle
+  if (phase !== "gallery" && phase !== "idle") return;
+  packCards = dramatizeOrder(packCards.filter((c) => normalizeCard(c)));
+  resetToIntro();
+}
+
 function registerEvents() {
   const startOpen = () => {
-    openPack().catch((error) => {
-      const message = error instanceof Error ? error.message : "Openen mislukt.";
-      setStatus(message, true);
-      resetToIntro();
-    });
+    void openPack();
   };
 
   el.openBtn.addEventListener("click", startOpen);
   el.pack.addEventListener("click", () => {
-    if (!el.pack.disabled) startOpen();
+    if (phase !== "idle" || el.pack.disabled) return;
+    startOpen();
   });
 
   el.replayBtn.addEventListener("click", () => {
-    packCards = dramatizeOrder(packCards);
-    resetToIntro();
+    if (el.replayBtn.disabled) return;
+    el.replayBtn.disabled = true;
+    try {
+      replayPack();
+    } finally {
+      // Re-enable after reset lands on intro (button is in gallery, hidden)
+      queueMicrotask(() => {
+        el.replayBtn.disabled = false;
+      });
+    }
   });
 
   el.skipBtn.addEventListener("click", () => {
-    revealAbort?.abort();
+    if (phase !== "revealing" && phase !== "opening") return;
+    runAbort?.abort();
   });
 
   window.addEventListener("resize", () => {
     if (particles.length) resizeCanvas();
   });
+
+  // Pagehide covers iframe teardown / Herladen navigation
+  window.addEventListener("pagehide", () => {
+    hardReset({ keepPhase: "idle" });
+  });
+}
+
+/**
+ * @param {SomtodayGrade[]} normal
+ * @param {SomtodayGrade[]} exam
+ */
+function buildPackFromGrades(normal, exam) {
+  /** @type {PackCard[]} */
+  const cards = [];
+  for (const g of normal) {
+    const c = toCard(g, "voortgang");
+    if (c) cards.push(c);
+  }
+  for (const g of exam) {
+    const c = toCard(g, "examen");
+    if (c) cards.push(c);
+  }
+  return dramatizeOrder(cards);
 }
 
 async function main() {
-  prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+  prefersReducedMotion = motionQuery.matches;
+  const onMotionChange = () => {
+    prefersReducedMotion = motionQuery?.matches ?? false;
+  };
+  if (typeof motionQuery.addEventListener === "function") {
+    motionQuery.addEventListener("change", onMotionChange);
+  } else if (typeof motionQuery.addListener === "function") {
+    motionQuery.addListener(onMotionChange);
+  }
+
   resizeCanvas();
   registerEvents();
   showStage("intro");
+  phase = "idle";
+  setIntroControlsEnabled(false);
 
   try {
     const context = await cyfers.getContext();
@@ -785,23 +1086,27 @@ async function main() {
       return;
     }
 
-    const [normal, exam] = await Promise.all([
+    // One endpoint failing must not wipe the other dossier
+    const [normalResult, examResult] = await Promise.allSettled([
       loadGrades("geldendvoortgangsdossierresultaten", studentId),
       loadGrades("geldendexamendossierresultaten", studentId),
     ]);
 
-    /** @type {PackCard[]} */
-    const cards = [];
-    for (const g of normal) {
-      const c = toCard(g, "voortgang");
-      if (c) cards.push(c);
-    }
-    for (const g of exam) {
-      const c = toCard(g, "examen");
-      if (c) cards.push(c);
+    const normal = normalResult.status === "fulfilled" ? normalResult.value : [];
+    const exam = examResult.status === "fulfilled" ? examResult.value : [];
+    const loadErrors = [normalResult, examResult]
+      .filter((r) => r.status === "rejected")
+      .map((r) => (r.status === "rejected" && r.reason instanceof Error ? r.reason.message : "Laden mislukt"));
+
+    if (normalResult.status === "rejected" && examResult.status === "rejected") {
+      el.subtitle.textContent = "Laden mislukt";
+      el.introTagline.textContent = "Laden mislukt";
+      el.packCount.textContent = "0 kaarten";
+      setStatus(loadErrors[0] || "Laden mislukt.", true);
+      return;
     }
 
-    packCards = dramatizeOrder(cards);
+    packCards = buildPackFromGrades(normal, exam);
 
     const pagedHint =
       normal.length >= PAGE_SIZE || exam.length >= PAGE_SIZE
@@ -812,21 +1117,30 @@ async function main() {
       el.subtitle.textContent = "Geen cijfers gevonden";
       el.packCount.textContent = "0 kaarten";
       el.introTagline.textContent = "Geen pakket";
-      setStatus("Er zijn nog geen cijfers om te openen.");
+      setStatus(
+        loadErrors.length
+          ? `Geen cijfers om te openen. (${loadErrors[0]})`
+          : "Er zijn nog geen cijfers om te openen.",
+      );
       return;
+    }
+
+    if (loadErrors.length) {
+      setStatus(`Een deel van de cijfers kon niet geladen worden. ${loadErrors[0]}`);
     }
 
     el.subtitle.textContent = `${packCards.length} cijfers klaar om te trekken${pagedHint}`;
     el.packCount.textContent =
       packCards.length === 1 ? "1 kaart" : `${packCards.length} kaarten`;
     el.introTagline.textContent = "Tik op het pakket of open hieronder";
-    el.openBtn.disabled = false;
-    el.pack.disabled = false;
+    setIntroControlsEnabled(true);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Laden mislukt.";
     el.subtitle.textContent = "Laden mislukt";
     el.introTagline.textContent = "Laden mislukt";
+    el.packCount.textContent = "0 kaarten";
     setStatus(message, true);
+    setIntroControlsEnabled(false);
   }
 }
 

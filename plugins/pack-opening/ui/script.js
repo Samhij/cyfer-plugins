@@ -875,13 +875,40 @@
         });
         if (rank >= 3) tone({ type: "sawtooth", freq: NOTE(-12), attack: 0.05, hold: 0.25, release: 1.2, gain: 0.06, lowpass: 1400 });
       },
+      /** Walkout tension bed: filtered pad + slow riser (no noise hiss). */
       crowd(seconds, hype) {
-        const g = 0.07 + hype * 0.025;
-        noise({ freq: 700, q: 0.5, attack: 1.2, hold: seconds, release: 1.6, gain: g });
-        noise({ freq: 1600, q: 0.7, attack: 1.6, hold: seconds, release: 1.4, gain: g * 0.6 });
+        const g = 0.045 + hype * 0.012;
+        const hold = Math.max(0.4, seconds);
+        // Deep sub pad
+        tone({ type: "sine", freq: 52, attack: 0.9, hold, release: 1.5, gain: g * 1.15 });
+        tone({ type: "triangle", freq: 78, attack: 1.1, hold, release: 1.5, gain: g * 0.7, lowpass: 320 });
+        // Slow tonal riser (FIFA-style drama without static)
+        tone({ type: "sawtooth", freq: 98, to: 147, attack: 1.5, hold: hold * 0.55, release: 1.8, gain: g * 0.38, lowpass: 780 });
+        tone({ type: "sine", freq: 196, to: 247, attack: 1.8, hold: hold * 0.4, release: 1.6, gain: g * 0.22, lowpass: 1200 });
+        // Soft airy fifth, very quiet
+        tone({ type: "sine", freq: 311, attack: 2.0, hold, release: 1.6, gain: g * 0.14 });
+        // Muted swell accents under each flash (~2.2s cadence)
+        const pulses = Math.max(1, Math.ceil(hold / 2.2));
+        for (let i = 0; i < pulses; i += 1) {
+          tone({
+            type: "triangle",
+            freq: 110,
+            to: 165,
+            attack: 0.28,
+            hold: 0.12,
+            release: 0.85,
+            gain: g * 0.5,
+            delay: i * 2.2,
+            lowpass: 900,
+          });
+        }
       },
+      /** Landing impact swell — tonal, not a noise roar. */
       roar(hype) {
-        noise({ freq: 900, q: 0.4, attack: 0.08, hold: 0.6, release: 2.2, gain: 0.12 + hype * 0.04 });
+        const g = 0.1 + hype * 0.03;
+        tone({ type: "sine", freq: 70, to: 36, attack: 0.04, hold: 0.35, release: 1.6, gain: g });
+        tone({ type: "sawtooth", freq: 110, to: 55, attack: 0.06, hold: 0.2, release: 1.4, gain: g * 0.35, lowpass: 700 });
+        tone({ type: "triangle", freq: 220, to: 165, attack: 0.05, hold: 0.15, release: 1.1, gain: g * 0.18, lowpass: 1400 });
       },
       fanfare() {
         const seq = [[-5, 0.0], [0, 0.16], [4, 0.32], [7, 0.48], [12, 0.7]];

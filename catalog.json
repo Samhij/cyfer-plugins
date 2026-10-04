@@ -25,8 +25,8 @@
     {
       "id": "vandaag",
       "name": "Vandaag",
-      "version": "1.0.2",
-      "description": "Lessen van vandaag op Overzicht, met nu-lijn",
+      "version": "1.0.3",
+      "description": "Lessen van vandaag op Overzicht, gecentreerd op de huidige les",
       "author": "Sam Hijmans",
       "kind": "widget",
       "nav": {

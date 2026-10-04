@@ -27,6 +27,7 @@ import type {
   SomtodayListResponse as _SomtodayListResponse,
   SomtodayPermission as _SomtodayPermission,
   SomtodaySchooljaar as _SomtodaySchooljaar,
+  SomtodayStatusNotification as _SomtodayStatusNotification,
   SomtodayStudent as _SomtodayStudent,
   SomtodayStudiewijzer as _SomtodayStudiewijzer,
   SomtodayStudiewijzerItem as _SomtodayStudiewijzerItem,
@@ -51,6 +52,7 @@ declare global {
   type SomtodayAfspraak = _SomtodayAfspraak;
   type SomtodayAfspraakItemType = _SomtodayAfspraakItemType;
   type SomtodayAfspraakItem = _SomtodayAfspraakItem;
+  type SomtodayStatusNotification = _SomtodayStatusNotification;
   type SomtodayAbsentieReden = _SomtodayAbsentieReden;
   type SomtodayAbsentieMelding = _SomtodayAbsentieMelding;
   type SomtodayLesgroep = _SomtodayLesgroep;

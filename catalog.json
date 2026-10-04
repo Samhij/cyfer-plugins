@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-04T00:39:02Z",
+  "updatedAt": "2026-10-04T01:16:13Z",
   "plugins": [
     {
       "id": "widget-cijfers",
@@ -25,7 +25,7 @@
     {
       "id": "vandaag",
       "name": "Vandaag",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "description": "Lessen van vandaag op Overzicht, met nu-lijn",
       "author": "Sam Hijmans",
       "kind": "widget",
@@ -45,7 +45,7 @@
     {
       "id": "rooster",
       "name": "Rooster",
-      "version": "1.1.1",
+      "version": "1.1.2",
       "description": "Weekrooster (ma–vr) op tijdlijn, overlappingen naast elkaar",
       "author": "Sam Hijmans",
       "kind": "page",

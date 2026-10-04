@@ -1,7 +1,7 @@
 {
   "id": "vandaag",
   "name": "Vandaag",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Lessen van vandaag op Overzicht, met nu-lijn",
   "author": "Sam Hijmans",
   "kind": "widget",

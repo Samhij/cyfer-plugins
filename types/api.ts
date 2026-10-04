@@ -206,13 +206,21 @@ export type SomtodayAfspraakItemType =
   | "ONBEKEND"
   | string;
 
+/** Per-item or envelope status tip from Somtoday (e.g. cancelled lesson). */
+export type SomtodayStatusNotification = {
+  status?: string;
+  message?: string;
+};
+
 /**
  * `GET /rest/v1/afspraakitems/{studentId}/jaar/{isoYear}/week/{isoWeek}` item.
  *
  * Assumptions (inferred from NONtoday leerling app + community clients; not a
  * live-checked Cyfers session):
- * - Response envelope is `{ items?: SomtodayAfspraakItem[] }` (optional
- *   `statusNotifications` ignored by plugins).
+ * - Response envelope is `{ items?: SomtodayAfspraakItem[], statusNotifications?: … }`.
+ * - Cancelled lessons stay in `items` with normal times; look for
+ *   `statusNotifications` status `"4007"`, and/or `wijzigingOmschrijving`
+ *   like `"Les vervalt"` (normal lessons often use status `"2002"`).
  * - `jaar` / `week` are ISO week-year and ISO week number (Monday-based).
  * - `vak` and `lesgroepen` are top-level (unlike `/rest/v1/afspraken`, which
  *   often nests vak under `additionalObjects`).
@@ -236,6 +244,15 @@ export type SomtodayAfspraakItem = SomtodayEntity & {
   docentNamen?: string[];
   bijlagen?: unknown[];
   aantalToekomstigeHerhalingen?: number;
+  /**
+   * Business status code on some payloads (e.g. `"2002"` normal,
+   * `"4001"` inschrijven niet mogelijk). Cancellation is `"4007"` when present.
+   */
+  status?: string;
+  /** Live-schedule change blurb, e.g. `"Les vervalt"`. */
+  wijzigingOmschrijving?: string;
+  /** Per-item tips; cancelled lessons include status `"4007"`. */
+  statusNotifications?: SomtodayStatusNotification[];
   additionalObjects?: {
     docentAfkortingen?: string;
     [key: string]: unknown;
@@ -346,4 +363,6 @@ export type SomtodayBoodschapConversatie = {
 
 export type SomtodayListResponse<T> = {
   items?: T[];
+  /** Envelope-level tips (NONtoday); cancellation may also sit on each item. */
+  statusNotifications?: SomtodayStatusNotification[];
 };

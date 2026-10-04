@@ -123,11 +123,53 @@ function isSameLocalDay(a, b) {
   );
 }
 
+/** Somtoday status code: lesson/appointment cancelled (“uitgevallen”). */
+const STATUS_CANCELLED = "4007";
+const CANCEL_LABEL_RE = /uitgevallen|vervalt|valt\s*uit/i;
+
 /**
  * @param {SomtodayAfspraakItem} item
  */
 function subjectOf(item) {
   return item.vak?.naam || item.vak?.afkorting || item.titel || "Les";
+}
+
+/**
+ * Cancelled lessons stay in the afspraakitems array with normal times; detect
+ * via statusNotifications / status `"4007"` or wijzigingOmschrijving text.
+ * @param {SomtodayAfspraakItem} item
+ */
+function isLessonCancelled(item) {
+  if (!item) return false;
+  if (String(item.status ?? "") === STATUS_CANCELLED) return true;
+  const wijziging = typeof item.wijzigingOmschrijving === "string" ? item.wijzigingOmschrijving.trim() : "";
+  if (wijziging && CANCEL_LABEL_RE.test(wijziging)) return true;
+  if (Array.isArray(item.statusNotifications)) {
+    for (const note of item.statusNotifications) {
+      if (!note) continue;
+      if (String(note.status ?? "") === STATUS_CANCELLED) return true;
+      if (typeof note.message === "string" && CANCEL_LABEL_RE.test(note.message)) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Label for cancelled badge — prefer Somtoday’s change text.
+ * @param {SomtodayAfspraakItem} item
+ */
+function cancellationLabel(item) {
+  const wijziging = typeof item.wijzigingOmschrijving === "string" ? item.wijzigingOmschrijving.trim() : "";
+  if (wijziging) return wijziging;
+  if (Array.isArray(item.statusNotifications)) {
+    for (const note of item.statusNotifications) {
+      if (note && String(note.status ?? "") === STATUS_CANCELLED && typeof note.message === "string") {
+        const msg = note.message.trim();
+        if (msg) return msg;
+      }
+    }
+  }
+  return "Uitgevallen";
 }
 
 /**
@@ -190,7 +232,9 @@ function layoutOverlappingLessons(items) {
 
   events.sort((a, b) => {
     if (a.startMin !== b.startMin) return a.startMin - b.startMin;
-    return b.endMin - a.endMin;
+    if (a.endMin !== b.endMin) return b.endMin - a.endMin;
+    // Active lessons before cancelled so replacements keep the primary column.
+    return Number(isLessonCancelled(a.item)) - Number(isLessonCancelled(b.item));
   });
 
   /** @type {number[]} */
@@ -308,10 +352,15 @@ function lessonPhase(nowMin, laid) {
  */
 function renderLesson(laid, dayStartMin) {
   const { item, startMin, endMin, column, columnCount } = laid;
+  const cancelled = isLessonCancelled(item);
   const li = document.createElement("li");
-  li.className = "lesson lesson-future";
+  li.className = cancelled ? "lesson lesson-future lesson-cancelled" : "lesson lesson-future";
   li.dataset.start = String(startMin);
   li.dataset.end = String(endMin);
+  if (cancelled) {
+    li.dataset.cancelled = "1";
+    li.setAttribute("aria-label", `${subjectOf(item)} — ${cancellationLabel(item)}`);
+  }
 
   const top = ((startMin - dayStartMin) / 60) * PX_PER_HOUR;
   const rawHeight = ((endMin - startMin) / 60) * PX_PER_HOUR;
@@ -336,11 +385,15 @@ function renderLesson(laid, dayStartMin) {
   const teacher = teacherOf(item);
   const location = (item.locatie || "").trim();
   const metaParts = [teacher, location].filter(Boolean);
+  const cancelBadge = cancelled
+    ? `<span class="lesson-badge">${escapeHtml(cancellationLabel(item))}</span>`
+    : "";
 
   li.innerHTML = `
     <div class="lesson-time">
       <span>${escapeHtml(time)}</span>
       ${period ? `<span class="lesson-period">${escapeHtml(period)}</span>` : ""}
+      ${cancelBadge}
     </div>
     <p class="lesson-subject">${escapeHtml(subjectOf(item))}</p>
     ${metaParts.length ? `<p class="lesson-meta">${escapeHtml(metaParts.join(" · "))}</p>` : ""}
@@ -354,8 +407,9 @@ function updateNowIndicator() {
 
   if (lessonsListEl) {
     for (const li of lessonsListEl.querySelectorAll(".lesson")) {
-      const start = Number(/** @type {HTMLElement} */ (li).dataset.start);
-      const end = Number(/** @type {HTMLElement} */ (li).dataset.end);
+      const el = /** @type {HTMLElement} */ (li);
+      const start = Number(el.dataset.start);
+      const end = Number(el.dataset.end);
       const phase = lessonPhase(nowMin, {
         item: /** @type {SomtodayAfspraakItem} */ ({}),
         startMin: start,
@@ -363,8 +417,10 @@ function updateNowIndicator() {
         column: 0,
         columnCount: 1,
       });
-      li.classList.remove("lesson-past", "lesson-current", "lesson-future");
-      li.classList.add(`lesson-${phase}`);
+      el.classList.remove("lesson-past", "lesson-current", "lesson-future");
+      el.classList.add(`lesson-${phase}`);
+      // Keep cancelled styling across phase refreshes.
+      if (el.dataset.cancelled === "1") el.classList.add("lesson-cancelled");
     }
   }
 

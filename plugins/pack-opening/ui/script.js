@@ -1859,8 +1859,12 @@
     return cards.slice().sort(byOvrDesc).reverse();
   }
 
+  /** Base duration for the grade count-up after a card flips (ms, before SPEED). */
+  const TICK_UP_MS = 2400;
+
   /**
    * Animate the rating number from 1,0 up to the real grade (cancellable via Phase).
+   * Hurry/abort jumps to the final value so early clicks stay clean.
    * @param {Phase} p
    * @param {HTMLElement} ratingEl
    * @param {GradeCard} card
@@ -1870,17 +1874,23 @@
     if (card.grade == null) return;
     let lastTick = 0;
     const target = card.grade;
-    await p.tween(1000 * scale, (t) => {
+    await p.tween(TICK_UP_MS * scale, (t) => {
       const eased = 1 - Math.pow(1 - t, 3);
       ratingEl.textContent = formatGrade(1 + (target - 1) * eased);
       const now = performance.now();
-      if (t < 1 && now - lastTick > 70) {
+      if (t < 1 && now - lastTick > 95) {
         lastTick = now;
         audio.tick();
       }
     });
     ratingEl.textContent = card.display;
     ratingEl.classList.toggle("is-long", card.display.length > 3);
+  }
+
+  /** Show tier glow / stage mood only once the card is face-up. */
+  function unveilTier(cardNode, card) {
+    cardNode.classList.remove("is-down");
+    els.stage.dataset.mood = card.tier;
   }
 
   function setHint(text) {
@@ -2071,10 +2081,11 @@
     const p = r.phase;
     r.step = "reveal";
     const list = revealQueue(r.cards);
+    // Keep the stadium neutral until each card flips — mood used to leak rarity.
+    els.stage.dataset.mood = "";
     for (let i = 0; i < list.length; i += 1) {
       const card = list[i];
       els.stageProgress.textContent = list.length > 1 ? `${i + 1} / ${list.length}` : "";
-      els.stage.dataset.mood = card.tier;
       fx.stopEmitters();
       const view = hypeOf(card) >= WALKOUT_HYPE ? await walkout(p, card, r) : await quickReveal(p, card, r);
       announce(`${card.subject}: ${card.display} — ${TIERS[card.tier].label}`);
@@ -2184,6 +2195,7 @@
     await p.wait(250 * slow);
     audio.whoosh();
     await p.animate(inner, [{ transform: "rotateY(180deg)" }, { transform: "rotateY(1080deg)" }], { duration: 1300 * slow, easing: "cubic-bezier(.15,.6,.2,1)" });
+    unveilTier(c, card);
 
     // Landing impact.
     audio.boom(hype);
@@ -2229,7 +2241,8 @@
 
     const view = document.createElement("div");
     view.className = "reveal";
-    view.style.setProperty("--wo", tier.color);
+    // Neutral until flip — tier color on --wo used to tint halo/banner early.
+    view.style.setProperty("--wo", "#9aa6b8");
     view.innerHTML = `
       <div class="wo-halo"></div>
       <div class="wo-slot"></div>
@@ -2256,11 +2269,13 @@
     const flip = p.animate(inner, [{ transform: "rotateY(180deg)" }, { transform: "rotateY(360deg)" }], { duration: 620, easing: "cubic-bezier(.3,.7,.2,1)" });
     quiet(flip);
     await p.wait(300);
+    await flip;
+    view.style.setProperty("--wo", tier.color);
+    unveilTier(c, card);
     const cb = c.getBoundingClientRect();
     fx.burst({ x: cb.left + cb.width / 2, y: cb.top + cb.height / 2, count: 40 + hype * 30, colors: tier.particles, speed: 6 + hype * 2, gravity: 0.1, life: 1000 });
     quiet(p.animate(view.querySelector(".wo-halo"), [{ opacity: 0 }, { opacity: 0.4 + hype * 0.15 }], { duration: 450 }));
-    await flip;
-    await tickUpRating(p, ratingEl, card, 0.75);
+    await tickUpRating(p, ratingEl, card, 0.9);
     audio.chime(tier.rank);
     await p.animate(/** @type {HTMLElement} */ (view.querySelector(".wo-banner")), [{ opacity: 0, transform: "translateY(16px)" }, { opacity: 1, transform: "none" }], { duration: 380 });
     return view;

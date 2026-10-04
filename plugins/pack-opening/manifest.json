@@ -1,7 +1,7 @@
 {
   "id": "pack-opening",
   "name": "Pack Opening",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Open packs met je Somtoday-cijfers: walkouts, zeldzaamheden en je eigen club",
   "author": "Sam Hijmans",
   "kind": "page",
@@ -17,6 +17,8 @@
       "/rest/v1/vakkeuzes/plaatsing/*/vakgemiddelden",
       "/rest/v1/geldendvoortgangsdossierresultaten/leerling/*",
       "/rest/v1/geldendexamendossierresultaten/leerling/*",
+      "/rest/v1/geldendvoortgangsdossierresultaten/vakresultaten/*/vak/*/lichting/*",
+      "/rest/v1/geldendexamendossierresultaten/vakresultaten/*/vak/*/lichting/*",
       "/rest/v1/resultaatpublicatiemomenten/volgende/leerling/*"
     ]
   }

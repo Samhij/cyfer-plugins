@@ -14,10 +14,10 @@ const MS_DAY = 24 * 60 * 60 * 1000;
 /** Fallback day window when today has no timed lessons (minutes from midnight). */
 const DEFAULT_START_MIN = 8 * 60;
 const DEFAULT_END_MIN = 16 * 60;
-/** Compact pixels per hour for Overview widgets. */
-const PX_PER_HOUR = 44;
+/** Pixels per hour for Overview widgets (fits time + subject + meta). */
+const PX_PER_HOUR = 72;
 /** Minimum visible card height so short slots stay readable. */
-const MIN_CARD_PX = 28;
+const MIN_CARD_PX = 48;
 const NOW_TICK_MS = 60_000;
 
 const dateLabelEl = document.getElementById("dateLabel");

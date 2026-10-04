@@ -1,11 +1,11 @@
 {
-  "updatedAt": "2026-10-04T16:35:03Z",
+  "updatedAt": "2026-10-04T20:12:41Z",
   "plugins": [
     {
       "id": "widget-cijfers",
       "name": "Cijfers",
-      "version": "1.0.0",
-      "description": "Voortgangs- en examencijfers op Overzicht",
+      "version": "1.0.1",
+      "description": "Vakgemiddelden per schooljaar op Overzicht",
       "author": "Sam Hijmans",
       "kind": "widget",
       "nav": {
@@ -15,8 +15,8 @@
       },
       "permissions": {
         "api": [
-          "/rest/v1/geldendvoortgangsdossierresultaten/leerling/*",
-          "/rest/v1/geldendexamendossierresultaten/leerling/*"
+          "/rest/v1/plaatsingen",
+          "/rest/v1/vakkeuzes/plaatsing/*/vakgemiddelden"
         ]
       },
       "downloadUrl": "",
@@ -65,7 +65,7 @@
     {
       "id": "pack-opening",
       "name": "Pack Opening",
-      "version": "1.0.2",
+      "version": "1.0.3",
       "description": "Open packs met je Somtoday-cijfers: walkouts, zeldzaamheden en je eigen club",
       "author": "Sam Hijmans",
       "kind": "page",
@@ -76,6 +76,8 @@
       },
       "permissions": {
         "api": [
+          "/rest/v1/plaatsingen",
+          "/rest/v1/vakkeuzes/plaatsing/*/vakgemiddelden",
           "/rest/v1/geldendvoortgangsdossierresultaten/leerling/*",
           "/rest/v1/geldendexamendossierresultaten/leerling/*",
           "/rest/v1/resultaatpublicatiemomenten/volgende/leerling/*"

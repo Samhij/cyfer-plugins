@@ -397,3 +397,64 @@ export type SomtodayResultaatPublicatieMoment = SomtodayEntity & {
   /** Optional label (e.g. one-off extra publicatiemoment). */
   naam?: string;
 };
+
+/**
+ * `GET /rest/v1/plaatsingen?leerling={studentId}` item (`RPlaatsing`).
+ *
+ * Path key for vakgemiddelden is the plaatsing UUID (NONtoday leerling app),
+ * not the numeric `links[].id`. Prefer `UUID` / `uuid`; fall back to self-link id.
+ */
+export type SomtodayPlaatsing = SomtodayEntity & {
+  UUID?: string;
+  uuid?: string;
+  /** True for the student’s current placement — default dropdown selection. */
+  huidig?: boolean;
+  leerjaar?: number;
+  stamgroepnaam?: string;
+  opleidingsnaam?: string;
+  vanafDatum?: string;
+  totDatum?: string;
+  schooljaar?: SomtodaySchooljaar;
+  leerling?: SomtodayStudent | SomtodayEntity;
+  vestiging?: SomtodayEntity & {
+    naam?: string;
+    afkorting?: string;
+    UUID?: string;
+    uuid?: string;
+  };
+};
+
+/** Nested subject choice on vakgemiddelden (`RVakkeuze`). */
+export type SomtodayVakkeuze = SomtodayEntity & {
+  vrijstelling?: boolean;
+  vak?: SomtodayVak;
+  leerling?: SomtodayStudent | SomtodayEntity;
+  relevanteCijferLichting?: SomtodayEntity & {
+    UUID?: string;
+    uuid?: string;
+    naam?: string;
+  };
+};
+
+/**
+ * One subject average inside `RLeerlingVakGemiddelden.gemiddelden`
+ * (`RLeerlingVakGemiddelde`). Result fields reuse `SomtodayGrade` shapes.
+ */
+export type SomtodayVakGemiddelde = SomtodayEntity & {
+  vakkeuze?: SomtodayVakkeuze;
+  vakAnderNiveau?: string;
+  niveauOmschrijving?: string;
+  afwijkendNiveauOmschrijving?: string;
+  voortgangsdossierResultaat?: SomtodayGrade;
+  voortgangsdossierResultaatAfwijkend?: SomtodayGrade;
+  examendossierResultaat?: SomtodayGrade;
+};
+
+/**
+ * `GET /rest/v1/vakkeuzes/plaatsing/{plaatsingUuid}/vakgemiddelden`
+ * (`RLeerlingVakGemiddelden`) — singular object, not wrapped in `items`.
+ */
+export type SomtodayVakGemiddelden = SomtodayEntity & {
+  gemiddelden?: SomtodayVakGemiddelde[];
+  voortgangsdossierGemiddelde?: number;
+};

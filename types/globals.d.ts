@@ -26,6 +26,7 @@ import type {
   SomtodayLink as _SomtodayLink,
   SomtodayListResponse as _SomtodayListResponse,
   SomtodayPermission as _SomtodayPermission,
+  SomtodayPlaatsing as _SomtodayPlaatsing,
   SomtodayResultaatPublicatieMoment as _SomtodayResultaatPublicatieMoment,
   SomtodaySchooljaar as _SomtodaySchooljaar,
   SomtodayStatusNotification as _SomtodayStatusNotification,
@@ -34,6 +35,9 @@ import type {
   SomtodayStudiewijzerItem as _SomtodayStudiewijzerItem,
   SomtodayStudiewijzerItemAfspraakToekenning as _SomtodayStudiewijzerItemAfspraakToekenning,
   SomtodayVak as _SomtodayVak,
+  SomtodayVakGemiddelde as _SomtodayVakGemiddelde,
+  SomtodayVakGemiddelden as _SomtodayVakGemiddelden,
+  SomtodayVakkeuze as _SomtodayVakkeuze,
 } from "./api";
 
 declare global {
@@ -66,6 +70,10 @@ declare global {
   type SomtodayBoodschapConversatie = _SomtodayBoodschapConversatie;
   type SomtodayListResponse<T> = _SomtodayListResponse<T>;
   type SomtodayResultaatPublicatieMoment = _SomtodayResultaatPublicatieMoment;
+  type SomtodayPlaatsing = _SomtodayPlaatsing;
+  type SomtodayVakkeuze = _SomtodayVakkeuze;
+  type SomtodayVakGemiddelde = _SomtodayVakGemiddelde;
+  type SomtodayVakGemiddelden = _SomtodayVakGemiddelden;
 
   /** Injected by the Cyfers host — do not ship your own SDK script. */
   const cyfers: _CyfersSdk;

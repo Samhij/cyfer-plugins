@@ -1,40 +1,48 @@
 <!DOCTYPE html>
 <html lang="nl">
 <head>
-    <meta charset="utf-8"/>
-    <meta content="width=device-width, initial-scale=1" name="viewport"/>
-    <title>Test</title>
-    <link href="style.css" rel="stylesheet"/>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1" name="viewport"/>
+  <title>Cijfers</title>
+  <link href="style.css" rel="stylesheet"/>
 </head>
 <body>
-<div id="content">
-    <button id="showNormalGrades">Voortgangscijfers</button>
-    <button id="showExamGrades">Examencijfers</button>
+  <div id="content">
+    <div class="toolbar">
+      <label class="year-label">
+        <span class="sr-only">Schooljaar</span>
+        <select id="yearPick" aria-label="Schooljaar" disabled>
+          <option value="">Schooljaar laden…</option>
+        </select>
+      </label>
+      <button type="button" id="showNormalGrades" class="primary">Voortgang</button>
+      <button type="button" id="showExamGrades">Examen</button>
+    </div>
+
+    <p id="status" class="muted" hidden></p>
 
     <table id="normalGrades">
-        <thead>
+      <thead>
         <tr>
-            <th>Vak</th>
-            <th>Cijfer</th>
-            <th>Datum</th>
+          <th>Vak</th>
+          <th>Gemiddelde</th>
+          <th>Niveau</th>
         </tr>
-        </thead>
-        <tbody>
-        </tbody>
+      </thead>
+      <tbody></tbody>
     </table>
 
-    <table id="examGrades">
-        <thead>
+    <table id="examGrades" hidden>
+      <thead>
         <tr>
-            <th>Vak</th>
-            <th>Cijfer</th>
-            <th>Datum</th>
+          <th>Vak</th>
+          <th>Gemiddelde</th>
+          <th>Niveau</th>
         </tr>
-        </thead>
-        <tbody>
-        </tbody>
+      </thead>
+      <tbody></tbody>
     </table>
-</div>
-<script src="script.js"></script>
+  </div>
+  <script src="script.js"></script>
 </body>
 </html>

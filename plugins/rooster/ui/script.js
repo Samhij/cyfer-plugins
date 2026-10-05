@@ -19,6 +19,13 @@ const DEFAULT_END_MIN = 16 * 60;
 const PX_PER_HOUR = 96;
 /** Minimum visible card height so short slots stay readable. */
 const MIN_CARD_PX = 48;
+/**
+ * Base min-width (rem) for a single-column day — keep in sync with
+ * `.days` in style.css (`minmax(10.5rem, …)`).
+ */
+const DAY_COL_MIN_REM = 10.5;
+/** Horizontal gap between concurrent side-by-side cards (px). */
+const OVERLAP_GAP_PX = 8;
 /** Refresh the “nu” line / current-lesson highlight this often. */
 const NOW_TICK_MS = 60_000;
 
@@ -335,6 +342,32 @@ function layoutOverlappingLessons(items) {
 }
 
 /**
+ * @param {LaidOutLesson[]} day
+ */
+function maxColumnsForDay(day) {
+  let max = 1;
+  for (const ev of day) {
+    if (ev.columnCount > max) max = ev.columnCount;
+  }
+  return max;
+}
+
+/**
+ * Widen days that pack concurrent lessons so each overlap column keeps
+ * roughly the same usable width as a single full-width lesson.
+ * @param {HTMLElement} daysEl
+ * @param {LaidOutLesson[][]} byDay
+ */
+function applyOverlapDayWidths(daysEl, byDay) {
+  const weights = byDay.map((day) => maxColumnsForDay(day));
+  daysEl.style.gridTemplateColumns = weights
+    .map((w) => `minmax(${DAY_COL_MIN_REM * w}rem, ${w}fr)`)
+    .join(" ");
+  const minRem = weights.reduce((sum, w) => sum + DAY_COL_MIN_REM * w, 0);
+  daysEl.style.minWidth = `${minRem}rem`;
+}
+
+/**
  * Snap timeline bounds to whole hours around the week's lessons.
  * @param {LaidOutLesson[][]} byDay
  */
@@ -420,11 +453,13 @@ function renderLesson(laid, dayStartMin) {
   const height = Math.max(rawHeight, MIN_CARD_PX);
   const widthPct = 100 / columnCount;
   const leftPct = column * widthPct;
+  // Wider inset when packed side-by-side so cards don't look smashed together.
+  const gapPx = columnCount > 1 ? OVERLAP_GAP_PX : 4;
 
   li.style.top = `${top}px`;
   li.style.height = `${height}px`;
-  li.style.left = `calc(${leftPct}% + 2px)`;
-  li.style.width = `calc(${widthPct}% - 4px)`;
+  li.style.left = `calc(${leftPct}% + ${gapPx / 2}px)`;
+  li.style.width = `calc(${widthPct}% - ${gapPx}px)`;
 
   const start = parseLocalDateTime(item.beginDatumTijd);
   const end = parseLocalDateTime(item.eindDatumTijd);
@@ -545,6 +580,7 @@ function renderSchedule(items) {
   const daysEl = document.createElement("div");
   daysEl.className = "days";
   daysEl.id = "days";
+  applyOverlapDayWidths(daysEl, byDay);
 
   let total = 0;
   let showNowIndicator = false;

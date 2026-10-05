@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-05T09:35:43Z",
+  "updatedAt": "2026-10-05T09:40:37Z",
   "plugins": [
     {
       "id": "widget-cijfers",
@@ -69,8 +69,8 @@
     {
       "id": "huiswerk",
       "name": "Huiswerk",
-      "version": "1.0.0",
-      "description": "Weekkalender (ma–vr) met huiswerk per dag, details en afvinken",
+      "version": "1.0.1",
+      "description": "Weekkalender (ma–vr) met huiswerk per dag, details en afvinken via Somtoday",
       "author": "Sam Hijmans",
       "kind": "page",
       "nav": {
@@ -82,7 +82,8 @@
         "api": [
           "/rest/v1/studiewijzeritemafspraaktoekenningen",
           "/rest/v1/studiewijzeritemdagtoekenningen",
-          "/rest/v1/studiewijzeritemweektoekenningen"
+          "/rest/v1/studiewijzeritemweektoekenningen",
+          "/rest/v1/swigemaakt/cou"
         ]
       },
       "downloadUrl": "",

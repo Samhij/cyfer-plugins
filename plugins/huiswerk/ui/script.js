@@ -3,6 +3,7 @@
 /**
  * @typedef {{
  *   id: string,
+ *   toekenningId: number,
  *   kind: "afspraak" | "dag" | "week",
  *   dayKey: string | null,
  *   title: string,
@@ -11,12 +12,12 @@
  *   subject: string,
  *   studiewijzer: string,
  *   sortering: number,
+ *   gemaakt: boolean,
  * }} HomeworkItem
  */
 
 const DAY_NAMES = ["Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag"];
 const MS_DAY = 24 * 60 * 60 * 1000;
-const DONE_STORAGE_KEY = "done-ids";
 
 const weekLabelEl = document.getElementById("weekLabel");
 const statusEl = document.getElementById("status");
@@ -43,10 +44,9 @@ let studentId = null;
 let loadSeq = 0;
 /** @type {Map<string, HomeworkItem>} */
 let itemsById = new Map();
-/** @type {Set<string>} */
-let doneIds = new Set();
 /** @type {HomeworkItem | null} */
 let openItem = null;
+let toggleBusy = false;
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -151,9 +151,10 @@ function parseLocalDateTime(raw) {
 /** @param {unknown} entity */
 function entityId(entity) {
   if (!entity || typeof entity !== "object") return null;
-  const links = /** @type {{ links?: { id?: number | string }[] }} */ (entity).links;
-  const id = links && links[0] && links[0].id;
-  return id == null ? null : String(id);
+  const links = /** @type {{ links?: { id?: number | string, rel?: string }[] }} */ (entity).links;
+  if (!Array.isArray(links) || links.length === 0) return null;
+  const self = links.find((l) => l && l.rel === "self") || links[0];
+  return self && self.id != null ? Number(self.id) : null;
 }
 
 /** @param {string} type */
@@ -165,6 +166,8 @@ function typeLabel(type) {
       return "Toets";
     case "HUISWERK":
       return "Huiswerk";
+    case "LESSTOF":
+      return "Lesstof";
     case "":
       return "Opdracht";
     default:
@@ -204,14 +207,31 @@ function sanitizeDescription(html) {
 }
 
 /**
+ * Official Leerling client reads gemaakt from additionalObjects.swigemaaktVinkjes.
+ * @param {any} raw
+ * @param {number} sid
+ */
+function readGemaakt(raw, sid) {
+  const wrap = raw && raw.additionalObjects && raw.additionalObjects.swigemaaktVinkjes;
+  const list = wrap && Array.isArray(wrap.items) ? wrap.items : [];
+  const match = list.find((row) => {
+    const leerling = row && row.leerling;
+    const id = entityId(leerling);
+    return id != null && id === sid;
+  });
+  return Boolean(match && match.gemaakt);
+}
+
+/**
  * @param {any} raw
  * @param {"afspraak" | "dag" | "week"} kind
+ * @param {number} sid
  * @returns {HomeworkItem | null}
  */
-function normalizeItem(raw, kind) {
+function normalizeItem(raw, kind, sid) {
   if (!raw || typeof raw !== "object") return null;
-  const id = entityId(raw);
-  if (!id) return null;
+  const toekenningId = entityId(raw);
+  if (toekenningId == null || Number.isNaN(toekenningId)) return null;
 
   const item = raw.studiewijzerItem || {};
   const lesgroep = raw.lesgroep || {};
@@ -229,7 +249,8 @@ function normalizeItem(raw, kind) {
   const dayKey = kind === "week" ? null : when ? formatDayKey(when) : null;
 
   return {
-    id: `${kind}:${id}`,
+    id: `${kind}:${toekenningId}`,
+    toekenningId,
     kind,
     dayKey,
     title: item.onderwerp || "Zonder titel",
@@ -238,15 +259,17 @@ function normalizeItem(raw, kind) {
     subject: String(subject),
     studiewijzer: String(studiewijzer.naam || ""),
     sortering: Number(raw.sortering) || 0,
+    gemaakt: readGemaakt(raw, sid),
   };
 }
 
 /**
  * @param {unknown} data
  * @param {"afspraak" | "dag" | "week"} kind
+ * @param {number} sid
  * @returns {HomeworkItem[]}
  */
-function itemsFromResponse(data, kind) {
+function itemsFromResponse(data, kind, sid) {
   const list =
     data && typeof data === "object" && Array.isArray(/** @type {any} */ (data).items)
       ? /** @type {any} */ (data).items
@@ -256,28 +279,10 @@ function itemsFromResponse(data, kind) {
   /** @type {HomeworkItem[]} */
   const out = [];
   for (const row of list) {
-    const normalized = normalizeItem(row, kind);
+    const normalized = normalizeItem(row, kind, sid);
     if (normalized) out.push(normalized);
   }
   return out;
-}
-
-async function loadDoneIds() {
-  try {
-    const raw = await cyfers.storage.get(DONE_STORAGE_KEY);
-    if (!raw) {
-      doneIds = new Set();
-      return;
-    }
-    const parsed = JSON.parse(raw);
-    doneIds = new Set(Array.isArray(parsed) ? parsed.map(String) : []);
-  } catch {
-    doneIds = new Set();
-  }
-}
-
-async function persistDoneIds() {
-  await cyfers.storage.set(DONE_STORAGE_KEY, JSON.stringify([...doneIds]));
 }
 
 function setStatus(message, isError) {
@@ -296,11 +301,10 @@ function setStatus(message, isError) {
  * @param {HomeworkItem} item
  */
 function itemButtonHtml(item) {
-  const done = doneIds.has(item.id);
   const badge = item.type ? `<span class="hw-badge">${escapeHtml(typeLabel(item.type))}</span>` : "";
   return `
     <li>
-      <button type="button" class="hw-item${done ? " is-done" : ""}" data-id="${escapeHtml(item.id)}">
+      <button type="button" class="hw-item${item.gemaakt ? " is-done" : ""}" data-id="${escapeHtml(item.id)}">
         <span class="hw-subject">${escapeHtml(item.subject)}</span>
         <span class="hw-title">${escapeHtml(item.title)}</span>
         ${badge}
@@ -333,7 +337,7 @@ function renderCalendar(dayItems, weekItems) {
     d.setDate(monday.getDate() + i);
     const key = formatDayKey(d);
     const list = (byDay.get(key) || []).slice().sort((a, b) => {
-      if (doneIds.has(a.id) !== doneIds.has(b.id)) return doneIds.has(a.id) ? 1 : -1;
+      if (a.gemaakt !== b.gemaakt) return a.gemaakt ? 1 : -1;
       return a.sortering - b.sortering || a.title.localeCompare(b.title, "nl");
     });
     const body =
@@ -359,11 +363,17 @@ function renderCalendar(dayItems, weekItems) {
   } else {
     weekStripEl.hidden = false;
     const sorted = weekItems.slice().sort((a, b) => {
-      if (doneIds.has(a.id) !== doneIds.has(b.id)) return doneIds.has(a.id) ? 1 : -1;
+      if (a.gemaakt !== b.gemaakt) return a.gemaakt ? 1 : -1;
       return a.sortering - b.sortering || a.title.localeCompare(b.title, "nl");
     });
     weekListEl.innerHTML = sorted.map(itemButtonHtml).join("");
   }
+}
+
+function refreshOpenDetailToggle() {
+  if (!openItem) return;
+  detailToggle.disabled = toggleBusy;
+  detailToggle.textContent = openItem.gemaakt ? "Markeer als open" : "Markeer als gedaan";
 }
 
 /**
@@ -380,8 +390,7 @@ function openDetail(item) {
   } else {
     detailBody.innerHTML = `<p class="detail-empty">Geen omschrijving.</p>`;
   }
-  const done = doneIds.has(item.id);
-  detailToggle.textContent = done ? "Markeer als open" : "Markeer als gedaan";
+  refreshOpenDetailToggle();
   detailEl.hidden = false;
 }
 
@@ -390,31 +399,72 @@ function closeDetail() {
   detailEl.hidden = true;
 }
 
+/**
+ * Official Somtoday Leerling client: PUT /rest/v1/swigemaakt/cou
+ * (NONtoday/leerling-source HuiswerkState.toggleAfgevinkt).
+ * @param {HomeworkItem} item
+ * @param {boolean} gemaakt
+ */
+async function putGemaakt(item, gemaakt) {
+  if (studentId == null) throw new Error("Geen leerling gevonden.");
+  const result = await cyfers.fetch("/rest/v1/swigemaakt/cou", {
+    method: "PUT",
+    body: {
+      leerling: {
+        links: [
+          {
+            id: studentId,
+            rel: "self",
+            type: "leerling.RLeerlingPrimer",
+          },
+        ],
+      },
+      swiToekenningId: item.toekenningId,
+      gemaakt,
+    },
+  });
+  const next =
+    result && typeof result === "object" && "gemaakt" in /** @type {object} */ (result)
+      ? Boolean(/** @type {{ gemaakt?: boolean }} */ (result).gemaakt)
+      : gemaakt;
+  return next;
+}
+
 async function toggleDone() {
-  if (!openItem) return;
-  if (doneIds.has(openItem.id)) doneIds.delete(openItem.id);
-  else doneIds.add(openItem.id);
+  if (!openItem || toggleBusy || studentId == null) return;
+  toggleBusy = true;
+  refreshOpenDetailToggle();
+  const target = !openItem.gemaakt;
   try {
-    await persistDoneIds();
+    const next = await putGemaakt(openItem, target);
+    openItem.gemaakt = next;
+    itemsById.set(openItem.id, openItem);
+    const dayItems = [...itemsById.values()].filter((i) => i.kind !== "week");
+    const weekItems = [...itemsById.values()].filter((i) => i.kind === "week");
+    renderCalendar(dayItems, weekItems);
+    setStatus("", false);
   } catch (err) {
-    setStatus(err instanceof Error ? err.message : "Kon status niet opslaan.", true);
+    setStatus(err instanceof Error ? err.message : "Afvinken mislukt.", true);
+  } finally {
+    toggleBusy = false;
+    refreshOpenDetailToggle();
   }
-  detailToggle.textContent = doneIds.has(openItem.id) ? "Markeer als open" : "Markeer als gedaan";
-  const dayItems = [...itemsById.values()].filter((i) => i.kind !== "week");
-  const weekItems = [...itemsById.values()].filter((i) => i.kind === "week");
-  renderCalendar(dayItems, weekItems);
 }
 
 /**
- * @param {IsoWeek} week
+ * Mirror official `_buildHuiswerkRequest` query shape (minus unused additionals).
+ * @param {Record<string, string | number>} weekParam
  * @param {number} sid
  */
-function buildQuery(week, sid) {
-  const jaarWeek = `${week.year}~${String(week.week).padStart(2, "0")}`;
-  const params = new URLSearchParams({
-    jaarWeek,
-    geenDifferentiatieOfGedifferentieerdVoorLeerling: String(sid),
-  });
+function buildQuery(weekParam, sid) {
+  const params = new URLSearchParams();
+  params.set("geenDifferentiatieOfGedifferentieerdVoorLeerling", String(sid));
+  for (const [key, value] of Object.entries(weekParam)) {
+    params.set(key, String(value));
+  }
+  // Official client always requests swigemaaktVinkjes to know gedaan-state.
+  params.append("additional", "swigemaaktVinkjes");
+  params.append("additional", "lesgroep");
   return params.toString();
 }
 
@@ -432,27 +482,23 @@ async function loadWeek() {
     return;
   }
 
-  const qs = buildQuery(currentWeek, studentId);
-  const monday = mondayOfIsoWeek(currentWeek.year, currentWeek.week);
-  const weekQs = new URLSearchParams({
-    begintNaOfOp: formatDayKey(monday),
-    weeknummer: String(currentWeek.week),
-    geenDifferentiatieOfGedifferentieerdVoorLeerling: String(studentId),
-  }).toString();
+  const jaarWeek = `${currentWeek.year}~${String(currentWeek.week).padStart(2, "0")}`;
+  const dayQs = buildQuery({ jaarWeek }, studentId);
+  const weekQs = buildQuery({ weeknummer: currentWeek.week }, studentId);
 
   try {
     const [afspraak, dag, week] = await Promise.all([
-      cyfers.fetch(`/rest/v1/studiewijzeritemafspraaktoekenningen?${qs}`),
-      cyfers.fetch(`/rest/v1/studiewijzeritemdagtoekenningen?${qs}`),
+      cyfers.fetch(`/rest/v1/studiewijzeritemafspraaktoekenningen?${dayQs}`),
+      cyfers.fetch(`/rest/v1/studiewijzeritemdagtoekenningen?${dayQs}`),
       cyfers.fetch(`/rest/v1/studiewijzeritemweektoekenningen?${weekQs}`),
     ]);
     if (seq !== loadSeq) return;
 
     const dayItems = [
-      ...itemsFromResponse(afspraak, "afspraak"),
-      ...itemsFromResponse(dag, "dag"),
+      ...itemsFromResponse(afspraak, "afspraak", studentId),
+      ...itemsFromResponse(dag, "dag", studentId),
     ];
-    const weekItems = itemsFromResponse(week, "week");
+    const weekItems = itemsFromResponse(week, "week", studentId);
 
     itemsById = new Map([...dayItems, ...weekItems].map((item) => [item.id, item]));
     renderCalendar(dayItems, weekItems);
@@ -501,7 +547,6 @@ document.addEventListener("keydown", (event) => {
 });
 
 async function main() {
-  await loadDoneIds();
   const ctx = await cyfers.getContext();
   const student = ctx.students && ctx.students[0];
   studentId = student && typeof student.id === "number" ? student.id : null;

@@ -1,8 +1,8 @@
 {
   "id": "huiswerk",
   "name": "Huiswerk",
-  "version": "1.0.0",
-  "description": "Weekkalender (ma–vr) met huiswerk per dag, details en afvinken",
+  "version": "1.0.1",
+  "description": "Weekkalender (ma–vr) met huiswerk per dag, details en afvinken via Somtoday",
   "author": "Sam Hijmans",
   "kind": "page",
   "entry": "ui/index.html",
@@ -15,7 +15,8 @@
     "api": [
       "/rest/v1/studiewijzeritemafspraaktoekenningen",
       "/rest/v1/studiewijzeritemdagtoekenningen",
-      "/rest/v1/studiewijzeritemweektoekenningen"
+      "/rest/v1/studiewijzeritemweektoekenningen",
+      "/rest/v1/swigemaakt/cou"
     ]
   }
 }

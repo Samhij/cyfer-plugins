@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1" name="viewport" />
+  <title>Huiswerk</title>
+  <link href="style.css" rel="stylesheet" />
+</head>
+<body>
+  <header class="toolbar">
+    <div class="toolbar-text">
+      <h1>Huiswerk</h1>
+      <p class="lede" id="weekLabel">Laden…</p>
+    </div>
+    <div class="toolbar-actions" role="group" aria-label="Weeknavigatie">
+      <button type="button" id="prevWeek" aria-label="Vorige week">← Vorige</button>
+      <button type="button" id="thisWeek" class="primary">Deze week</button>
+      <button type="button" id="nextWeek" aria-label="Volgende week">Volgende →</button>
+    </div>
+  </header>
+
+  <div id="status" class="muted" hidden></div>
+
+  <section id="weekStrip" class="week-strip" hidden aria-label="Weekopdrachten">
+    <h2 class="week-strip-title">Deze week</h2>
+    <ul id="weekList" class="hw-list"></ul>
+  </section>
+
+  <div id="calendar" class="calendar" aria-live="polite"></div>
+
+  <div id="detail" class="detail" hidden role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+    <button type="button" class="detail-backdrop" id="detailBackdrop" aria-label="Sluiten" tabindex="-1"></button>
+    <div class="detail-panel">
+      <header class="detail-head">
+        <p class="detail-meta" id="detailMeta"></p>
+        <h2 id="detailTitle"></h2>
+        <p class="detail-type" id="detailType"></p>
+      </header>
+      <div class="detail-body" id="detailBody"></div>
+      <footer class="detail-actions">
+        <button type="button" id="detailToggle" class="primary">Markeer als gedaan</button>
+        <button type="button" id="detailClose">Sluiten</button>
+      </footer>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

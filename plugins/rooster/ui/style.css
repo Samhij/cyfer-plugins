@@ -3,7 +3,20 @@
  * Open the cyfer-plugins repo root in VS Code/Cursor for --token / class autocomplete.
  */
 
+html {
+  height: 100%;
+}
+
+body {
+  box-sizing: border-box;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .toolbar {
+  flex: none;
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
@@ -27,6 +40,7 @@
 }
 
 #status {
+  flex: none;
   margin-bottom: 0.85rem;
 }
 
@@ -37,8 +51,12 @@
   border-radius: 2px;
 }
 
-.schedule-scroll {
-  overflow-x: auto;
+/* Single scroll viewport — week grid scrolls here in both axes; toolbar stays pinned. */
+.schedule {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
   -webkit-overflow-scrolling: touch;
 }
 

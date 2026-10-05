@@ -527,9 +527,6 @@ function renderSchedule(items) {
   todayLessonsListEl = null;
   stopNowTimer();
 
-  const scroll = document.createElement("div");
-  scroll.className = "schedule-scroll";
-
   const body = document.createElement("div");
   body.className = "schedule-body";
 
@@ -601,8 +598,7 @@ function renderSchedule(items) {
   }
 
   body.appendChild(daysEl);
-  scroll.appendChild(body);
-  scheduleEl.appendChild(scroll);
+  scheduleEl.appendChild(body);
 
   if (showNowIndicator) startNowTimer();
 

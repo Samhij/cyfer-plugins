@@ -1,0 +1,22 @@
+{
+  "id": "huiswerk",
+  "name": "Huiswerk",
+  "version": "1.0.2",
+  "description": "Weekkalender (ma–vr) met huiswerk per dag; afvinken via checkbox of details",
+  "author": "Sam Hijmans",
+  "kind": "page",
+  "entry": "ui/index.html",
+  "nav": {
+    "label": "Huiswerk",
+    "icon": "NotebookPen",
+    "order": 15
+  },
+  "permissions": {
+    "api": [
+      "/rest/v1/studiewijzeritemafspraaktoekenningen",
+      "/rest/v1/studiewijzeritemdagtoekenningen",
+      "/rest/v1/studiewijzeritemweektoekenningen",
+      "/rest/v1/swigemaakt/cou"
+    ]
+  }
+}

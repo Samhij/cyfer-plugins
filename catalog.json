@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-04T21:10:15Z",
+  "updatedAt": "2026-10-05T09:43:18Z",
   "plugins": [
     {
       "id": "widget-cijfers",
@@ -65,6 +65,29 @@
       },
       "downloadUrl": "",
       "sourceUrl": "https://github.com/Samhij/cyfer-plugins/tree/main/plugins/rooster"
+    },
+    {
+      "id": "huiswerk",
+      "name": "Huiswerk",
+      "version": "1.0.2",
+      "description": "Weekkalender (ma–vr) met huiswerk per dag; afvinken via checkbox of details",
+      "author": "Sam Hijmans",
+      "kind": "page",
+      "nav": {
+        "label": "Huiswerk",
+        "icon": "NotebookPen",
+        "order": 15
+      },
+      "permissions": {
+        "api": [
+          "/rest/v1/studiewijzeritemafspraaktoekenningen",
+          "/rest/v1/studiewijzeritemdagtoekenningen",
+          "/rest/v1/studiewijzeritemweektoekenningen",
+          "/rest/v1/swigemaakt/cou"
+        ]
+      },
+      "downloadUrl": "",
+      "sourceUrl": "https://github.com/Samhij/cyfer-plugins/tree/main/plugins/huiswerk"
     },
     {
       "id": "pack-opening",

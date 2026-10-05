@@ -302,13 +302,24 @@ function setStatus(message, isError) {
  */
 function itemButtonHtml(item) {
   const badge = item.type ? `<span class="hw-badge">${escapeHtml(typeLabel(item.type))}</span>` : "";
+  const doneLabel = item.gemaakt ? "Markeer als open" : "Markeer als gedaan";
   return `
-    <li>
-      <button type="button" class="hw-item${item.gemaakt ? " is-done" : ""}" data-id="${escapeHtml(item.id)}">
+    <li class="hw-row${item.gemaakt ? " is-done" : ""}">
+      <button type="button" class="hw-item" data-id="${escapeHtml(item.id)}">
         <span class="hw-subject">${escapeHtml(item.subject)}</span>
         <span class="hw-title">${escapeHtml(item.title)}</span>
         ${badge}
       </button>
+      <label class="hw-check" title="${escapeHtml(doneLabel)}">
+        <input
+          type="checkbox"
+          class="hw-done"
+          data-id="${escapeHtml(item.id)}"
+          ${item.gemaakt ? "checked" : ""}
+          ${toggleBusy ? "disabled" : ""}
+          aria-label="${escapeHtml(doneLabel)}"
+        />
+      </label>
     </li>
   `;
 }
@@ -430,25 +441,50 @@ async function putGemaakt(item, gemaakt) {
   return next;
 }
 
-async function toggleDone() {
-  if (!openItem || toggleBusy || studentId == null) return;
+function rerenderFromState() {
+  const dayItems = [...itemsById.values()].filter((i) => i.kind !== "week");
+  const weekItems = [...itemsById.values()].filter((i) => i.kind === "week");
+  renderCalendar(dayItems, weekItems);
+  if (openItem) {
+    const fresh = itemsById.get(openItem.id);
+    if (fresh) openItem = fresh;
+    refreshOpenDetailToggle();
+  }
+}
+
+/**
+ * @param {HomeworkItem} item
+ * @param {boolean} target
+ */
+async function setGemaaktState(item, target) {
+  if (toggleBusy || studentId == null) return;
   toggleBusy = true;
   refreshOpenDetailToggle();
-  const target = !openItem.gemaakt;
+  document.querySelectorAll("input.hw-done").forEach((el) => {
+    if (el instanceof HTMLInputElement) el.disabled = true;
+  });
   try {
-    const next = await putGemaakt(openItem, target);
-    openItem.gemaakt = next;
-    itemsById.set(openItem.id, openItem);
-    const dayItems = [...itemsById.values()].filter((i) => i.kind !== "week");
-    const weekItems = [...itemsById.values()].filter((i) => i.kind === "week");
-    renderCalendar(dayItems, weekItems);
+    const next = await putGemaakt(item, target);
+    item.gemaakt = next;
+    itemsById.set(item.id, item);
+    if (openItem && openItem.id === item.id) openItem.gemaakt = next;
     setStatus("", false);
+    rerenderFromState();
   } catch (err) {
     setStatus(err instanceof Error ? err.message : "Afvinken mislukt.", true);
+    rerenderFromState();
   } finally {
     toggleBusy = false;
     refreshOpenDetailToggle();
+    document.querySelectorAll("input.hw-done").forEach((el) => {
+      if (el instanceof HTMLInputElement) el.disabled = false;
+    });
   }
+}
+
+async function toggleDone() {
+  if (!openItem) return;
+  await setGemaaktState(openItem, !openItem.gemaakt);
 }
 
 /**
@@ -514,12 +550,44 @@ async function loadWeek() {
 function onListClick(event) {
   const target = event.target;
   if (!(target instanceof Element)) return;
+  if (target.closest(".hw-check, .hw-done")) {
+    event.stopPropagation();
+    return;
+  }
   const btn = target.closest("button.hw-item");
   if (!btn) return;
   const id = btn.getAttribute("data-id");
   if (!id) return;
   const item = itemsById.get(id);
   if (item) openDetail(item);
+}
+
+/**
+ * @param {Event} event
+ */
+function onDoneChange(event) {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement) || !target.classList.contains("hw-done")) return;
+  event.stopPropagation();
+  const id = target.getAttribute("data-id");
+  if (!id) return;
+  const item = itemsById.get(id);
+  if (!item || toggleBusy || studentId == null) {
+    target.checked = Boolean(item && item.gemaakt);
+    return;
+  }
+  setGemaaktState(item, target.checked).catch(() => {});
+}
+
+/**
+ * Keep checkbox clicks from bubbling to the row / opening detail.
+ * @param {Event} event
+ */
+function onDoneClick(event) {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  if (!target.closest(".hw-check, .hw-done")) return;
+  event.stopPropagation();
 }
 
 prevBtn.addEventListener("click", () => {
@@ -537,6 +605,10 @@ thisBtn.addEventListener("click", () => {
 
 calendarEl.addEventListener("click", onListClick);
 weekListEl.addEventListener("click", onListClick);
+calendarEl.addEventListener("click", onDoneClick, true);
+weekListEl.addEventListener("click", onDoneClick, true);
+calendarEl.addEventListener("change", onDoneChange);
+weekListEl.addEventListener("change", onDoneChange);
 detailBackdrop.addEventListener("click", closeDetail);
 detailClose.addEventListener("click", closeDetail);
 detailToggle.addEventListener("click", () => {

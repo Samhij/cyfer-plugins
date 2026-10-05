@@ -109,32 +109,100 @@
   gap: 0.35rem;
 }
 
+.hw-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 0;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--bg-elevated);
+  min-width: 0;
+}
+
+.hw-row:hover,
+.hw-row:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+}
+
+.hw-row.is-done {
+  opacity: 0.62;
+}
+
+.hw-row.is-done .hw-title {
+  text-decoration: line-through;
+}
+
 .hw-item {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 0.15rem;
   width: 100%;
+  min-width: 0;
   text-align: left;
   padding: 0.45rem 0.5rem;
-  border: 1px solid var(--line);
-  border-radius: 2px;
-  background: var(--bg-elevated);
+  padding-right: 2rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: inherit;
   cursor: pointer;
   font: inherit;
 }
 
-.hw-item:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+.hw-item:hover:not(:disabled),
+.hw-item:active:not(:disabled) {
+  transform: none;
+  background: transparent;
 }
 
-.hw-item.is-done {
-  opacity: 0.62;
+.hw-check {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  display: grid;
+  place-items: center;
+  width: 1.45rem;
+  height: 1.45rem;
+  margin: 0;
+  border-radius: 2px;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
 }
 
-.hw-item.is-done .hw-title {
-  text-decoration: line-through;
+.hw-row:hover .hw-check,
+.hw-row:focus-within .hw-check,
+.hw-row.is-done .hw-check,
+.hw-check:has(input:focus-visible) {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .hw-check {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .hw-item {
+    padding-right: 2rem;
+  }
+}
+
+.hw-done {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.hw-done:disabled {
+  cursor: wait;
 }
 
 .hw-subject {

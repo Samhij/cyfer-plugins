@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-05T09:40:37Z",
+  "updatedAt": "2026-10-05T09:43:18Z",
   "plugins": [
     {
       "id": "widget-cijfers",
@@ -69,8 +69,8 @@
     {
       "id": "huiswerk",
       "name": "Huiswerk",
-      "version": "1.0.1",
-      "description": "Weekkalender (ma–vr) met huiswerk per dag, details en afvinken via Somtoday",
+      "version": "1.0.2",
+      "description": "Weekkalender (ma–vr) met huiswerk per dag; afvinken via checkbox of details",
       "author": "Sam Hijmans",
       "kind": "page",
       "nav": {

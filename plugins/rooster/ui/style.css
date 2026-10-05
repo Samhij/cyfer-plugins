@@ -37,11 +37,6 @@
   border-radius: 2px;
 }
 
-.schedule-scroll {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
 .schedule-body {
   display: grid;
   grid-template-columns: 3.75rem minmax(0, 1fr);

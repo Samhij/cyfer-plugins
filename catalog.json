@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-05T09:43:18Z",
+  "updatedAt": "2026-10-05T09:46:07Z",
   "plugins": [
     {
       "id": "widget-cijfers",
@@ -24,7 +24,7 @@
         ]
       },
       "downloadUrl": "",
-      "sourceUrl": "https://github.com/Samhij/cyfer-plugins/tree/main/plugins/widget-cijfers"
+      "sourceUrl": "https://github.com/cyfers-somtoday/cyfer-plugins/tree/main/plugins/widget-cijfers"
     },
     {
       "id": "vandaag",
@@ -44,7 +44,7 @@
         ]
       },
       "downloadUrl": "",
-      "sourceUrl": "https://github.com/Samhij/cyfer-plugins/tree/main/plugins/vandaag"
+      "sourceUrl": "https://github.com/cyfers-somtoday/cyfer-plugins/tree/main/plugins/vandaag"
     },
     {
       "id": "rooster",
@@ -64,7 +64,7 @@
         ]
       },
       "downloadUrl": "",
-      "sourceUrl": "https://github.com/Samhij/cyfer-plugins/tree/main/plugins/rooster"
+      "sourceUrl": "https://github.com/cyfers-somtoday/cyfer-plugins/tree/main/plugins/rooster"
     },
     {
       "id": "huiswerk",
@@ -87,7 +87,7 @@
         ]
       },
       "downloadUrl": "",
-      "sourceUrl": "https://github.com/Samhij/cyfer-plugins/tree/main/plugins/huiswerk"
+      "sourceUrl": "https://github.com/cyfers-somtoday/cyfer-plugins/tree/main/plugins/huiswerk"
     },
     {
       "id": "pack-opening",
@@ -113,7 +113,7 @@
         ]
       },
       "downloadUrl": "",
-      "sourceUrl": "https://github.com/Samhij/cyfer-plugins/tree/main/plugins/pack-opening"
+      "sourceUrl": "https://github.com/cyfers-somtoday/cyfer-plugins/tree/main/plugins/pack-opening"
     }
   ]
 }

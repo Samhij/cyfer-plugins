@@ -1,7 +1,7 @@
 {
   "id": "rooster",
   "name": "Rooster",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "description": "Weekrooster (ma–vr) op tijdlijn, overlappingen naast elkaar, met nu-lijn",
   "author": "Sam Hijmans",
   "kind": "page",

@@ -5,6 +5,7 @@
  *   item: SomtodayAfspraakItem,
  *   startMin: number,
  *   endMin: number,
+ *   visualEndMin: number,
  *   column: number,
  *   columnCount: number,
  * }} LaidOutLesson
@@ -19,8 +20,22 @@ const DEFAULT_END_MIN = 16 * 60;
 const PX_PER_HOUR = 96;
 /** Minimum visible card height so short slots stay readable. */
 const MIN_CARD_PX = 48;
+/**
+ * Minimum card height expressed in timeline minutes.
+ * Short lessons still occupy this much vertical space when packed.
+ */
+const MIN_CARD_MIN = (MIN_CARD_PX / PX_PER_HOUR) * 60;
 /** Refresh the “nu” line / current-lesson highlight this often. */
 const NOW_TICK_MS = 60_000;
+
+/**
+ * Rendered card bottom on the timeline (clock end, or start + min card height).
+ * @param {number} startMin
+ * @param {number} endMin
+ */
+function visualEndForLesson(startMin, endMin) {
+  return Math.max(endMin, startMin + MIN_CARD_MIN);
+}
 
 const weekLabelEl = document.getElementById("weekLabel");
 const statusEl = document.getElementById("status");
@@ -258,6 +273,11 @@ function updateWeekChrome() {
 /**
  * Classic calendar overlap packing: assign leftmost free column, then split
  * width evenly across the max column count in each overlapping cluster.
+ *
+ * Collision uses *visual* occupancy (min card height), not only clock end —
+ * a short lesson that ends at 11:45 still draws ~30 timeline minutes tall, so
+ * a lesson starting ~10 minutes later must pack beside it instead of stacking.
+ *
  * @param {SomtodayAfspraakItem[]} items
  * @returns {LaidOutLesson[]}
  */
@@ -276,6 +296,7 @@ function layoutOverlappingLessons(items) {
       item,
       startMin,
       endMin,
+      visualEndMin: visualEndForLesson(startMin, endMin),
       column: 0,
       columnCount: 1,
     });
@@ -288,7 +309,7 @@ function layoutOverlappingLessons(items) {
     return Number(isLessonCancelled(a.item)) - Number(isLessonCancelled(b.item));
   });
 
-  /** @type {number[]} end minute of the last event placed in each column */
+  /** @type {number[]} visual end minute of the last event placed in each column */
   const columnEnds = [];
 
   for (const ev of events) {
@@ -301,21 +322,21 @@ function layoutOverlappingLessons(items) {
     }
     if (col === -1) {
       col = columnEnds.length;
-      columnEnds.push(ev.endMin);
+      columnEnds.push(ev.visualEndMin);
     } else {
-      columnEnds[col] = ev.endMin;
+      columnEnds[col] = ev.visualEndMin;
     }
     ev.column = col;
   }
 
-  // Cluster by transitive overlap so concurrent groups share one columnCount.
+  // Cluster by transitive *visual* overlap so concurrent groups share one columnCount.
   /** @type {LaidOutLesson[][]} */
   const clusters = [];
   /** @type {LaidOutLesson[]} */
   let active = [];
 
   for (const ev of events) {
-    active = active.filter((other) => other.endMin > ev.startMin);
+    active = active.filter((other) => other.visualEndMin > ev.startMin);
     if (active.length === 0) {
       clusters.push([ev]);
     } else {

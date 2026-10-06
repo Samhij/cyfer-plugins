@@ -1854,9 +1854,9 @@
   let run = null;
   let runSeq = 0;
 
-  /** Every pack card, ascending by rating so the biggest pull comes last. */
+  /** Reveal order is shuffled; pack overview still sorts by rating (best first). */
   function revealQueue(cards) {
-    return cards.slice().sort(byOvrDesc).reverse();
+    return shuffle(cards);
   }
 
   /**

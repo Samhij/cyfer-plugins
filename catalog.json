@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-05T18:41:15Z",
+  "updatedAt": "2026-10-06T10:24:10Z",
   "plugins": [
     {
       "id": "widget-cijfers",
@@ -92,7 +92,7 @@
     {
       "id": "pack-opening",
       "name": "Pack Opening",
-      "version": "1.0.8",
+      "version": "1.0.9",
       "description": "Open packs met je Somtoday-cijfers: walkouts, zeldzaamheden en je eigen club",
       "author": "Sam Hijmans",
       "kind": "page",

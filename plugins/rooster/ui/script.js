@@ -11,6 +11,15 @@
  * }} LaidOutLesson
  */
 
+/**
+ * Vacation bar clamped to the visible Mon–Fri columns (0 = Ma … 4 = Vr).
+ * @typedef {{
+ *   naam: string,
+ *   from: number,
+ *   to: number,
+ * }} VacationSpan
+ */
+
 const DAY_NAMES = ["Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag"];
 const MS_DAY = 24 * 60 * 60 * 1000;
 /** Fallback day window when the week has no timed lessons (minutes from midnight). */
@@ -59,6 +68,12 @@ let nowLineEl = null;
 let todayLessonsListEl = null;
 /** @type {number | null} */
 let nowTimer = null;
+/**
+ * Cached vacations for the student. `null` = not loaded yet (or last fetch failed
+ * and we should retry). Empty array means “loaded, none”.
+ * @type {SomtodayVakantie[] | null}
+ */
+let vakantiesCache = null;
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -155,6 +170,83 @@ function formatHourLabel(minutes) {
 /** @param {Date} date */
 function formatShortDate(date) {
   return date.toLocaleDateString("nl-NL", { day: "numeric", month: "short" });
+}
+
+/**
+ * Parse a Somtoday whole-day timestamp to local midnight.
+ * Docs use offset datetimes (`2023-10-16T00:00:00.000+02:00`); take the
+ * calendar YYYY-MM-DD prefix so UTC conversion cannot shift the day.
+ * @param {string | undefined} raw
+ * @returns {Date | null}
+ */
+function parseLocalDay(raw) {
+  if (!raw) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(raw));
+  if (!m) {
+    const fallback = new Date(raw);
+    if (Number.isNaN(fallback.getTime())) return null;
+    return new Date(fallback.getFullYear(), fallback.getMonth(), fallback.getDate());
+  }
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+}
+
+/** @param {Date} date */
+function startOfLocalDay(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+/**
+ * Inclusive calendar-day difference (end − start), floored to whole days.
+ * @param {Date} start
+ * @param {Date} end
+ */
+function calendarDayDiff(start, end) {
+  return Math.round((startOfLocalDay(end).getTime() - startOfLocalDay(start).getTime()) / MS_DAY);
+}
+
+/**
+ * Map vacations onto the visible Mon–Fri columns of an ISO week.
+ * Weekend-only overlap yields no span; partial weeks are clamped.
+ * @param {SomtodayVakantie[]} vakanties
+ * @param {Date} monday Monday 00:00 of the visible week
+ * @returns {VacationSpan[]}
+ */
+function vacationSpansForWeek(vakanties, monday) {
+  const weekStart = startOfLocalDay(monday);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 4); // Friday
+
+  /** @type {VacationSpan[]} */
+  const spans = [];
+
+  for (const vakantie of vakanties) {
+    const start = parseLocalDay(vakantie.beginDatum);
+    const end = parseLocalDay(vakantie.eindDatum);
+    if (!start || !end) continue;
+    if (end < start) continue;
+
+    const clampStart = start > weekStart ? start : weekStart;
+    const clampEnd = end < weekEnd ? end : weekEnd;
+    if (clampStart > clampEnd) continue;
+
+    const from = calendarDayDiff(weekStart, clampStart);
+    const to = calendarDayDiff(weekStart, clampEnd);
+    if (from > 4 || to < 0) continue;
+
+    const naam =
+      typeof vakantie.naam === "string" && vakantie.naam.trim()
+        ? vakantie.naam.trim()
+        : "Vakantie";
+
+    spans.push({
+      naam,
+      from: Math.max(0, from),
+      to: Math.min(4, to),
+    });
+  }
+
+  spans.sort((a, b) => a.from - b.from || a.to - b.to || a.naam.localeCompare(b.naam, "nl"));
+  return spans;
 }
 
 /** @param {IsoWeek} parts */
@@ -516,13 +608,42 @@ function startNowTimer() {
 }
 
 /**
- * @param {SomtodayAfspraakItem[]} items
+ * Bars above the day columns; each shows the vacation `naam` and may span
+ * consecutive Mon–Fri days in the visible week.
+ * @param {VacationSpan[]} spans
+ * @returns {HTMLElement | null}
  */
-function renderSchedule(items) {
+function renderVacationBars(spans) {
+  if (!spans.length) return null;
+
+  const row = document.createElement("div");
+  row.className = "vacation-bars";
+  row.setAttribute("role", "list");
+  row.setAttribute("aria-label", "Vakanties deze week");
+
+  for (const span of spans) {
+    const bar = document.createElement("div");
+    bar.className = "vacation-bar";
+    bar.setAttribute("role", "listitem");
+    bar.style.gridColumn = `${span.from + 1} / ${span.to + 2}`;
+    bar.textContent = span.naam;
+    bar.title = span.naam;
+    row.appendChild(bar);
+  }
+
+  return row;
+}
+
+/**
+ * @param {SomtodayAfspraakItem[]} items
+ * @param {SomtodayVakantie[]} vakanties
+ */
+function renderSchedule(items, vakanties = []) {
   const monday = mondayOfIsoWeek(currentWeek.year, currentWeek.week);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const viewingCurrentWeek = isSameWeek(currentWeek, isoWeekParts(today));
+  const vacationSpans = vacationSpansForWeek(vakanties, monday);
 
   /** @type {SomtodayAfspraakItem[][]} */
   const rawByDay = [[], [], [], [], []];
@@ -549,10 +670,18 @@ function renderSchedule(items) {
   stopNowTimer();
 
   const body = document.createElement("div");
-  body.className = "schedule-body";
+  body.className = vacationSpans.length
+    ? "schedule-body has-vacations"
+    : "schedule-body";
 
   const gutter = document.createElement("div");
   gutter.className = "hours-gutter";
+  if (vacationSpans.length) {
+    const vacationSpacer = document.createElement("div");
+    vacationSpacer.className = "hours-gutter-vacation";
+    vacationSpacer.setAttribute("aria-hidden", "true");
+    gutter.appendChild(vacationSpacer);
+  }
   const gutterHead = document.createElement("div");
   gutterHead.className = "hours-gutter-head";
   gutter.appendChild(gutterHead);
@@ -562,6 +691,12 @@ function renderSchedule(items) {
   axisWrap.appendChild(renderHoursAxis(trackStartMin, trackEndMin));
   gutter.appendChild(axisWrap);
   body.appendChild(gutter);
+
+  const main = document.createElement("div");
+  main.className = "schedule-main";
+
+  const vacationRow = renderVacationBars(vacationSpans);
+  if (vacationRow) main.appendChild(vacationRow);
 
   const daysEl = document.createElement("div");
   daysEl.className = "days";
@@ -618,7 +753,8 @@ function renderSchedule(items) {
     daysEl.appendChild(section);
   }
 
-  body.appendChild(daysEl);
+  main.appendChild(daysEl);
+  body.appendChild(main);
   scheduleEl.appendChild(body);
 
   if (showNowIndicator) startNowTimer();
@@ -627,6 +763,25 @@ function renderSchedule(items) {
     setStatus("empty", "Geen lessen deze week.");
   } else {
     setStatus("muted", "");
+  }
+}
+
+/**
+ * Load vacations once per session; failures never break the schedule.
+ * @returns {Promise<SomtodayVakantie[]>}
+ */
+async function loadVakanties() {
+  if (vakantiesCache !== null) return vakantiesCache;
+  if (!studentId) return [];
+
+  try {
+    /** @type {SomtodayListResponse<SomtodayVakantie>} */
+    const data = await cyfers.fetch(`/rest/v1/vakanties/leerling/${studentId}`);
+    vakantiesCache = Array.isArray(data?.items) ? data.items : [];
+    return vakantiesCache;
+  } catch {
+    // Leave cache null so a later week navigation can retry.
+    return [];
   }
 }
 
@@ -650,10 +805,12 @@ async function loadWeek() {
     const path =
       `/rest/v1/afspraakitems/${studentId}/jaar/${currentWeek.year}/week/${currentWeek.week}` +
       "?additional=docentAfkortingen";
-    /** @type {SomtodayListResponse<SomtodayAfspraakItem>} */
-    const data = await cyfers.fetch(path);
+    const [data, vakanties] = await Promise.all([
+      /** @type {Promise<SomtodayListResponse<SomtodayAfspraakItem>>} */ (cyfers.fetch(path)),
+      loadVakanties(),
+    ]);
     if (seq !== loadSeq) return;
-    renderSchedule(data?.items ?? []);
+    renderSchedule(data?.items ?? [], vakanties);
   } catch (error) {
     if (seq !== loadSeq) return;
     const message = error instanceof Error ? error.message : "Laden mislukt.";

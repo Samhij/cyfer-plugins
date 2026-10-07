@@ -373,6 +373,22 @@ export type SomtodayListResponse<T> = {
 };
 
 /**
+ * `GET /rest/v1/vakanties/leerling/{studentId}` item (`participatie.RVakantie`).
+ *
+ * Documented in NONtoday/somtoday-api-docs (README → Vakanties):
+ * - Envelope is `{ items?: SomtodayVakantie[] }`.
+ * - `naam` is the display label (e.g. `"Herfstvakantie"`).
+ * - `beginDatum` / `eindDatum` are inclusive whole-day timestamps with offset
+ *   (e.g. `"2023-10-16T00:00:00.000+02:00"`). Use the calendar date part;
+ *   do not convert via UTC (that can shift the day).
+ */
+export type SomtodayVakantie = SomtodayEntity & {
+  naam?: string;
+  beginDatum?: string;
+  eindDatum?: string;
+};
+
+/**
  * `GET /rest/v1/resultaatpublicatiemomenten/volgende/leerling/{studentId}`
  *
  * Next delayed-grade publication moment for a student (Somtoday “uitgesteld

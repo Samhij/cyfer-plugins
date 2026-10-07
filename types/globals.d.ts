@@ -38,6 +38,7 @@ import type {
   SomtodayVak as _SomtodayVak,
   SomtodayVakGemiddelde as _SomtodayVakGemiddelde,
   SomtodayVakGemiddelden as _SomtodayVakGemiddelden,
+  SomtodayVakantie as _SomtodayVakantie,
   SomtodayVakkeuze as _SomtodayVakkeuze,
 } from "./api";
 
@@ -76,6 +77,7 @@ declare global {
   type SomtodayVakkeuze = _SomtodayVakkeuze;
   type SomtodayVakGemiddelde = _SomtodayVakGemiddelde;
   type SomtodayVakGemiddelden = _SomtodayVakGemiddelden;
+  type SomtodayVakantie = _SomtodayVakantie;
 
   /** Injected by the Cyfers host — do not ship your own SDK script. */
   const cyfers: _CyfersSdk;

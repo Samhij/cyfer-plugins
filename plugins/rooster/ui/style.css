@@ -44,14 +44,53 @@
   min-width: 0;
 }
 
+.schedule-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .hours-gutter {
   min-width: 0;
   overflow: visible;
 }
 
+.hours-gutter-vacation {
+  height: 1.7rem;
+  margin-bottom: 0.4rem;
+}
+
 .hours-gutter-head {
   height: 2.6rem;
   margin-bottom: 0.4rem;
+}
+
+.vacation-bars {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(10.5rem, 1fr));
+  gap: 0.6rem;
+  min-width: 52.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.vacation-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: 1.7rem;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line));
+  border-radius: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .hours-axis-wrap {
@@ -269,7 +308,8 @@
     grid-template-columns: 3.25rem minmax(0, 1fr);
   }
 
-  .days {
+  .days,
+  .vacation-bars {
     min-width: 45rem;
   }
 }

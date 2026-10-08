@@ -93,8 +93,11 @@ Required shape (see `types/api.ts` → `PluginManifest`; host validates in
 | `entry` | Under `ui/`, usually `ui/index.html` |
 | `nav.label` | Sidebar / Overview title |
 | `nav.icon` | Lucide icon name, PascalCase (invalid → `Puzzle`) |
-| `nav.order` | Sort key (lower first) |
 | `permissions.api` | List of `/rest/...` globs; keep minimal |
+
+Sidebar / Overview **order is user-controlled in Cyfers** (Plugins screen). Do
+not set `nav.order` in manifests; the catalog does not ship it. Legacy
+`nav.order` is only a host fallback until the user sets their own order.
 
 ### Page vs widget
 
@@ -155,7 +158,7 @@ Cyfers reads this file (default URL:
 `https://raw.githubusercontent.com/Samhij/cyfer-plugins/main/catalog.json`).
 
 Generated from every `plugins/*/manifest.json` with `"listed": false` skipped
-(by `scripts/generate-catalog.py`; sort: `nav.order`, then label). Includes
+(by `scripts/generate-catalog.py`; sort: label, then id). Includes
 `sourceUrl` pointing at the plugin tree.
 
 ```bash

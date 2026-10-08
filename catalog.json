@@ -1,72 +1,6 @@
 {
-  "updatedAt": "2026-10-08T09:50:47Z",
+  "updatedAt": "2026-10-08T09:59:32Z",
   "plugins": [
-    {
-      "id": "widget-cijfers",
-      "name": "Cijfers",
-      "version": "1.0.2",
-      "description": "Individuele voortgangs- en examencijfers per schooljaar op Overzicht",
-      "author": "Sam Hijmans",
-      "kind": "widget",
-      "nav": {
-        "label": "Cijfers",
-        "icon": "ChartColumn",
-        "order": 0
-      },
-      "permissions": {
-        "api": [
-          "/rest/v1/plaatsingen",
-          "/rest/v1/vakkeuzes/plaatsing/*/vakgemiddelden",
-          "/rest/v1/geldendvoortgangsdossierresultaten/leerling/*",
-          "/rest/v1/geldendexamendossierresultaten/leerling/*",
-          "/rest/v1/geldendvoortgangsdossierresultaten/vakresultaten/*/vak/*/lichting/*",
-          "/rest/v1/geldendexamendossierresultaten/vakresultaten/*/vak/*/lichting/*"
-        ]
-      },
-      "downloadUrl": "",
-      "sourceUrl": "https://github.com/cyfers-somtoday/cyfer-plugins/tree/main/plugins/widget-cijfers"
-    },
-    {
-      "id": "vandaag",
-      "name": "Vandaag",
-      "version": "1.0.3",
-      "description": "Lessen van vandaag op Overzicht, gecentreerd op de huidige les",
-      "author": "Sam Hijmans",
-      "kind": "widget",
-      "nav": {
-        "label": "Vandaag",
-        "icon": "Clock",
-        "order": 5
-      },
-      "permissions": {
-        "api": [
-          "/rest/v1/afspraakitems/*/jaar/*/week/*"
-        ]
-      },
-      "downloadUrl": "",
-      "sourceUrl": "https://github.com/cyfers-somtoday/cyfer-plugins/tree/main/plugins/vandaag"
-    },
-    {
-      "id": "rooster",
-      "name": "Rooster",
-      "version": "1.2.0",
-      "description": "Weekrooster (ma–vr) op tijdlijn, overlappingen naast elkaar, met nu-lijn en vakantiebalken",
-      "author": "Sam Hijmans",
-      "kind": "page",
-      "nav": {
-        "label": "Rooster",
-        "icon": "CalendarDays",
-        "order": 10
-      },
-      "permissions": {
-        "api": [
-          "/rest/v1/afspraakitems/*/jaar/*/week/*",
-          "/rest/v1/vakanties/leerling/*"
-        ]
-      },
-      "downloadUrl": "",
-      "sourceUrl": "https://github.com/cyfers-somtoday/cyfer-plugins/tree/main/plugins/rooster"
-    },
     {
       "id": "berichten",
       "name": "Berichten",
@@ -76,8 +10,7 @@
       "kind": "page",
       "nav": {
         "label": "Berichten",
-        "icon": "Mail",
-        "order": 12
+        "icon": "Mail"
       },
       "permissions": {
         "api": [
@@ -90,7 +23,31 @@
         ]
       },
       "downloadUrl": "",
-      "sourceUrl": "https://github.com/cyfers-somtoday/cyfer-plugins/tree/main/plugins/berichten"
+      "sourceUrl": "https://github.com/Samhij/cyfer-plugins/tree/main/plugins/berichten"
+    },
+    {
+      "id": "widget-cijfers",
+      "name": "Cijfers",
+      "version": "1.0.2",
+      "description": "Individuele voortgangs- en examencijfers per schooljaar op Overzicht",
+      "author": "Sam Hijmans",
+      "kind": "widget",
+      "nav": {
+        "label": "Cijfers",
+        "icon": "ChartColumn"
+      },
+      "permissions": {
+        "api": [
+          "/rest/v1/plaatsingen",
+          "/rest/v1/vakkeuzes/plaatsing/*/vakgemiddelden",
+          "/rest/v1/geldendvoortgangsdossierresultaten/leerling/*",
+          "/rest/v1/geldendexamendossierresultaten/leerling/*",
+          "/rest/v1/geldendvoortgangsdossierresultaten/vakresultaten/*/vak/*/lichting/*",
+          "/rest/v1/geldendexamendossierresultaten/vakresultaten/*/vak/*/lichting/*"
+        ]
+      },
+      "downloadUrl": "",
+      "sourceUrl": "https://github.com/Samhij/cyfer-plugins/tree/main/plugins/widget-cijfers"
     },
     {
       "id": "huiswerk",
@@ -101,8 +58,7 @@
       "kind": "page",
       "nav": {
         "label": "Huiswerk",
-        "icon": "NotebookPen",
-        "order": 15
+        "icon": "NotebookPen"
       },
       "permissions": {
         "api": [
@@ -113,7 +69,7 @@
         ]
       },
       "downloadUrl": "",
-      "sourceUrl": "https://github.com/cyfers-somtoday/cyfer-plugins/tree/main/plugins/huiswerk"
+      "sourceUrl": "https://github.com/Samhij/cyfer-plugins/tree/main/plugins/huiswerk"
     },
     {
       "id": "pack-opening",
@@ -124,8 +80,7 @@
       "kind": "page",
       "nav": {
         "label": "Packs",
-        "icon": "PackageOpen",
-        "order": 20
+        "icon": "PackageOpen"
       },
       "permissions": {
         "api": [
@@ -139,7 +94,46 @@
         ]
       },
       "downloadUrl": "",
-      "sourceUrl": "https://github.com/cyfers-somtoday/cyfer-plugins/tree/main/plugins/pack-opening"
+      "sourceUrl": "https://github.com/Samhij/cyfer-plugins/tree/main/plugins/pack-opening"
+    },
+    {
+      "id": "rooster",
+      "name": "Rooster",
+      "version": "1.2.0",
+      "description": "Weekrooster (ma–vr) op tijdlijn, overlappingen naast elkaar, met nu-lijn en vakantiebalken",
+      "author": "Sam Hijmans",
+      "kind": "page",
+      "nav": {
+        "label": "Rooster",
+        "icon": "CalendarDays"
+      },
+      "permissions": {
+        "api": [
+          "/rest/v1/afspraakitems/*/jaar/*/week/*",
+          "/rest/v1/vakanties/leerling/*"
+        ]
+      },
+      "downloadUrl": "",
+      "sourceUrl": "https://github.com/Samhij/cyfer-plugins/tree/main/plugins/rooster"
+    },
+    {
+      "id": "vandaag",
+      "name": "Vandaag",
+      "version": "1.0.3",
+      "description": "Lessen van vandaag op Overzicht, gecentreerd op de huidige les",
+      "author": "Sam Hijmans",
+      "kind": "widget",
+      "nav": {
+        "label": "Vandaag",
+        "icon": "Clock"
+      },
+      "permissions": {
+        "api": [
+          "/rest/v1/afspraakitems/*/jaar/*/week/*"
+        ]
+      },
+      "downloadUrl": "",
+      "sourceUrl": "https://github.com/Samhij/cyfer-plugins/tree/main/plugins/vandaag"
     }
   ]
 }

@@ -22,7 +22,7 @@ Required fields:
 | `author` | Your name or handle |
 | `kind` | `page` (sidebar) or `widget` (Overview only) |
 | `entry` | Usually `ui/index.html` |
-| `nav.label` / `nav.icon` / `nav.order` | Lucide icon name in PascalCase |
+| `nav.label` / `nav.icon` | Lucide icon name in PascalCase; sidebar order is set by the user in Cyfers |
 | `permissions.api` | Glob paths under `/rest/` |
 | `listed` | Optional; set `false` to keep a template plugin out of the store |
 

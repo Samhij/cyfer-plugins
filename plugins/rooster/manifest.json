@@ -8,8 +8,7 @@
   "entry": "ui/index.html",
   "nav": {
     "label": "Rooster",
-    "icon": "CalendarDays",
-    "order": 10
+    "icon": "CalendarDays"
   },
   "permissions": {
     "api": [

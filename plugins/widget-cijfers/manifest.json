@@ -8,8 +8,7 @@
   "entry": "ui/index.html",
   "nav": {
     "label": "Cijfers",
-    "icon": "ChartColumn",
-    "order": 0
+    "icon": "ChartColumn"
   },
   "permissions": {
     "api": [

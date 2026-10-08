@@ -65,10 +65,8 @@ def load_manifest(path: Path, expected_id: str) -> dict:
         raise SystemExit(f"{path}: nav is required")
     label = str(nav.get("label", name)).strip() or name
     icon = str(nav.get("icon", "Puzzle")).strip() or "Puzzle"
-    try:
-        order = int(nav.get("order", 100))
-    except (TypeError, ValueError):
-        order = 100
+    # nav.order is intentionally omitted — Cyfers users set sidebar/widget order
+    # in the host app. Legacy order keys in manifests are ignored here.
 
     permissions = data.get("permissions")
     if not isinstance(permissions, dict) or not isinstance(permissions.get("api"), list):
@@ -93,7 +91,7 @@ def load_manifest(path: Path, expected_id: str) -> dict:
         "description": description,
         "author": author,
         "kind": kind,
-        "nav": {"label": label, "icon": icon, "order": order},
+        "nav": {"label": label, "icon": icon},
         "permissions": {"api": api},
         "downloadUrl": "",
         "sourceUrl": source_url(plugin_id),
@@ -114,7 +112,7 @@ def build_catalog() -> dict:
             continue
         plugins.append(entry)
 
-    plugins.sort(key=lambda p: (p["nav"]["order"], p["nav"]["label"].lower(), p["id"]))
+    plugins.sort(key=lambda p: (p["nav"]["label"].lower(), p["id"]))
     return {
         "updatedAt": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         "plugins": plugins,

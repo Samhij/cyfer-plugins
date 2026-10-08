@@ -79,6 +79,7 @@ const composeEl = document.getElementById("compose");
 const composeForm = /** @type {HTMLFormElement} */ (document.getElementById("composeForm"));
 const composeTitle = document.getElementById("composeTitle");
 const composeError = document.getElementById("composeError");
+const listSearch = /** @type {HTMLInputElement | null} */ (document.getElementById("listSearch"));
 const recipientSearch = /** @type {HTMLInputElement} */ (document.getElementById("recipientSearch"));
 const recipientChips = document.getElementById("recipientChips");
 const recipientResults = document.getElementById("recipientResults");
@@ -104,6 +105,8 @@ let selectedKey = null;
 let editingDraft = null;
 /** @type {Map<number, Ontvanger>} */
 let selectedRecipients = new Map();
+/** Client-side list filter (no Somtoday search endpoint in leerling-source). */
+let listQuery = "";
 let canView = false;
 let canSend = false;
 let loadSeq = 0;
@@ -408,12 +411,69 @@ function setTab(tab) {
 }
 
 /**
+ * @returns {string}
+ */
+function currentListQuery() {
+  return foldSearch(listQuery);
+}
+
+/**
+ * Match against onderwerp, plain inhoud, and sender / counterpart names.
+ * @param {Conversatie} conv
+ * @param {string} q
+ */
+function conversatieMatchesQuery(conv, q) {
+  if (!q) return true;
+  const parts = [
+    conv.onderwerp,
+    conv.counterpart,
+    conv.preview,
+    ...conv.boodschappen.flatMap((m) => [
+      m.onderwerp,
+      toPlainPreview(m.inhoud),
+      m.verzenderNaam,
+      ...m.ontvangerNamen,
+    ]),
+  ];
+  return foldSearch(parts.join(" ")).includes(q);
+}
+
+/**
+ * @param {Draft} draft
+ * @param {string} q
+ */
+function draftMatchesQuery(draft, q) {
+  if (!q) return true;
+  const parts = [
+    draft.onderwerp,
+    toPlainPreview(draft.inhoud),
+    ...draft.ontvangerLabels,
+  ];
+  return foldSearch(parts.join(" ")).includes(q);
+}
+
+/**
  * @returns {Conversatie[]}
  */
 function filteredConversaties() {
-  if (activeTab === "inbox") return conversaties.filter((c) => c.hasReceived);
-  if (activeTab === "sent") return conversaties.filter((c) => c.hasSent);
-  return [];
+  const q = currentListQuery();
+  /** @type {Conversatie[]} */
+  let items = [];
+  if (activeTab === "inbox") items = conversaties.filter((c) => c.hasReceived);
+  else if (activeTab === "sent") items = conversaties.filter((c) => c.hasSent);
+  else return [];
+  return q ? items.filter((c) => conversatieMatchesQuery(c, q)) : items;
+}
+
+/**
+ * @returns {Draft[]}
+ */
+function filteredDrafts() {
+  const sorted = drafts
+    .slice()
+    .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
+  const q = currentListQuery();
+  return q ? sorted.filter((d) => draftMatchesQuery(d, q)) : sorted;
 }
 
 function renderList() {
@@ -424,23 +484,24 @@ function renderList() {
       listEl.innerHTML = `<p class="empty">Nog geen concepten. Sla een concept op vanuit Nieuw bericht.</p>`;
       return;
     }
-    listEl.innerHTML = `<ul class="thread-list">${drafts
-      .slice()
-      .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))
+    const visible = filteredDrafts();
+    if (visible.length === 0) {
+      listEl.innerHTML = `<p class="empty">Geen concepten die overeenkomen met je zoekopdracht.</p>`;
+      return;
+    }
+    listEl.innerHTML = visible
       .map((d) => {
         const active = selectedKey === `draft:${d.id}` ? " is-active" : "";
         const meta = d.kind === "reply"
           ? "Reactie · concept"
           : `${d.ontvangerLabels.join(", ") || "Geen ontvanger"} · concept`;
-        return `<li>
-          <button type="button" class="thread-btn${active}" data-draft-id="${escapeHtml(d.id)}">
+        return `<button type="button" class="thread-btn${active}" data-draft-id="${escapeHtml(d.id)}">
             <span class="thread-subject">${escapeHtml(d.onderwerp || "(geen onderwerp)")}</span>
             <span class="thread-meta">${escapeHtml(meta)}</span>
             <span class="thread-preview">${escapeHtml(truncate(toPlainPreview(d.inhoud), 100) || "Leeg concept")}</span>
-          </button>
-        </li>`;
+          </button>`;
       })
-      .join("")}</ul>`;
+      .join("");
     listEl.querySelectorAll("[data-draft-id]").forEach((btn) => {
       btn.addEventListener("click", () => {
         selectedKey = `draft:${btn.getAttribute("data-draft-id")}`;
@@ -451,30 +512,35 @@ function renderList() {
     return;
   }
 
-  const items = filteredConversaties();
-  if (items.length === 0) {
-    const empty =
-      activeTab === "inbox"
-        ? "Geen ontvangen berichten."
-        : "Nog geen verzonden berichten.";
-    listEl.innerHTML = `<p class="empty">${empty}</p>`;
+  const tabEmpty =
+    activeTab === "inbox"
+      ? conversaties.every((c) => !c.hasReceived)
+      : conversaties.every((c) => !c.hasSent);
+  if (tabEmpty) {
+    listEl.innerHTML = `<p class="empty">${
+      activeTab === "inbox" ? "Geen ontvangen berichten." : "Nog geen verzonden berichten."
+    }</p>`;
     return;
   }
 
-  listEl.innerHTML = `<ul class="thread-list">${items
+  const items = filteredConversaties();
+  if (items.length === 0) {
+    listEl.innerHTML = `<p class="empty">Geen berichten die overeenkomen met je zoekopdracht.</p>`;
+    return;
+  }
+
+  listEl.innerHTML = items
     .map((c) => {
       const active = selectedKey === c.key ? " is-active" : "";
       const unread = c.unread ? " is-unread" : "";
       const dot = c.unread ? `<span class="unread-dot" aria-hidden="true"></span>` : "";
-      return `<li>
-        <button type="button" class="thread-btn${active}${unread}" data-conv-key="${escapeHtml(c.key)}">
+      return `<button type="button" class="thread-btn${active}${unread}" data-conv-key="${escapeHtml(c.key)}">
           <span class="thread-subject">${dot}${escapeHtml(c.onderwerp)}</span>
           <span class="thread-meta">${escapeHtml(c.counterpart)} · ${escapeHtml(formatDateTime(c.when))}</span>
           <span class="thread-preview">${escapeHtml(c.preview || "")}</span>
-        </button>
-      </li>`;
+        </button>`;
     })
-    .join("")}</ul>`;
+    .join("");
 
   listEl.querySelectorAll("[data-conv-key]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -1189,6 +1255,22 @@ document.querySelectorAll(".tab").forEach((btn) => {
     const tab = /** @type {TabId} */ (btn.getAttribute("data-tab") || "inbox");
     setTab(tab);
   });
+});
+
+listSearch?.addEventListener("input", () => {
+  listQuery = listSearch.value || "";
+  renderList();
+  // Clear detail if the selected item is no longer visible.
+  if (activeTab === "drafts") {
+    const draftId = selectedKey?.startsWith("draft:") ? selectedKey.slice(6) : null;
+    if (draftId && !filteredDrafts().some((d) => d.id === draftId)) {
+      selectedKey = null;
+      renderDetail();
+    }
+  } else if (selectedKey && !filteredConversaties().some((c) => c.key === selectedKey)) {
+    selectedKey = null;
+    renderDetail();
+  }
 });
 
 refreshBtn?.addEventListener("click", () => {

@@ -36,6 +36,15 @@
 
     <div class="layout">
       <section class="list-pane" aria-label="Lijst">
+        <label class="list-search">
+          <span class="visually-hidden">Zoeken in berichten</span>
+          <input
+            type="search"
+            id="listSearch"
+            placeholder="Zoek op onderwerp, inhoud of afzender…"
+            autocomplete="off"
+          />
+        </label>
         <div id="list" class="thread-list" aria-live="polite"></div>
       </section>
 

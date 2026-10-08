@@ -281,10 +281,15 @@
   inset: 0;
   z-index: 20;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
   padding: 1rem;
   background: color-mix(in srgb, var(--ink) 28%, transparent);
+}
+
+/* `display` on the class would otherwise override the HTML [hidden] attribute. */
+.compose-sheet[hidden] {
+  display: none !important;
 }
 
 .compose-panel {
@@ -363,6 +368,10 @@ html[data-theme="dark"] .compose-panel {
   border: 1px solid var(--line);
   border-radius: 2px;
   background: color-mix(in srgb, var(--bg-elevated) 80%, transparent);
+}
+
+.recipient-results[hidden] {
+  display: none !important;
 }
 
 .recipient-option {

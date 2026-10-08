@@ -159,6 +159,17 @@ function truncate(text, max) {
 }
 
 /**
+ * @param {string} value
+ */
+function foldSearch(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+/**
  * @param {unknown} person
  */
 function personLabel(person) {
@@ -167,10 +178,37 @@ function personLabel(person) {
   const parts = [p.roepnaam, p.voorletters, p.voorvoegsel, p.achternaam]
     .map((x) => (typeof x === "string" ? x.trim() : ""))
     .filter(Boolean);
-  if (parts.length) return parts.join(" ");
-  if (typeof p.afkorting === "string" && p.afkorting.trim()) return p.afkorting.trim();
-  if (typeof p.naam === "string" && p.naam.trim()) return p.naam.trim();
-  return "";
+  let label = parts.join(" ");
+  const afkorting = typeof p.afkorting === "string" ? p.afkorting.trim() : "";
+  if (!label && afkorting) label = afkorting;
+  if (!label && typeof p.naam === "string" && p.naam.trim()) label = p.naam.trim();
+  if (label && afkorting && !label.toLowerCase().includes(afkorting.toLowerCase())) {
+    label = `${label} (${afkorting})`;
+  }
+  return label;
+}
+
+/**
+ * Search haystack matching leerling-source `zoekNaam` (naam + afkorting, accent-fold).
+ * @param {unknown} person
+ * @param {string} label
+ */
+function personSearchText(person, label) {
+  if (!person || typeof person !== "object") return foldSearch(label);
+  const p = /** @type {Record<string, unknown>} */ (person);
+  const bits = [
+    label,
+    p.roepnaam,
+    p.voorletters,
+    typeof p.voorletters === "string" ? p.voorletters.replaceAll(".", "") : "",
+    p.voorvoegsel,
+    p.achternaam,
+    p.afkorting,
+    p.naam,
+  ]
+    .map((x) => (typeof x === "string" ? x : ""))
+    .filter(Boolean);
+  return foldSearch(bits.join(" "));
 }
 
 /**
@@ -607,21 +645,28 @@ function renderRecipientChips() {
 
 /**
  * @param {string} query
+ * @param {{ allowEmpty?: boolean }} [opts]
  */
-function renderRecipientResults(query) {
+function renderRecipientResults(query, opts = {}) {
   if (!recipientResults) return;
-  const q = query.trim().toLowerCase();
-  if (!q) {
+  const q = foldSearch(query);
+  if (!q && !opts.allowEmpty) {
     recipientResults.hidden = true;
     recipientResults.innerHTML = "";
     return;
   }
-  const matches = ontvangers
-    .filter((o) => !selectedRecipients.has(o.id) && o.search.includes(q))
-    .slice(0, 12);
+  if (!ontvangersLoaded) {
+    recipientResults.hidden = false;
+    recipientResults.innerHTML = `<p class="muted" style="margin:0.35rem">Docenten laden…</p>`;
+    return;
+  }
+  const available = ontvangers.filter((o) => !selectedRecipients.has(o.id));
+  const matches = (q ? available.filter((o) => o.search.includes(q)) : available).slice(0, 12);
   if (matches.length === 0) {
     recipientResults.hidden = false;
-    recipientResults.innerHTML = `<p class="muted" style="margin:0.35rem">Geen docenten gevonden.</p>`;
+    recipientResults.innerHTML = `<p class="muted" style="margin:0.35rem">${
+      ontvangers.length === 0 ? "Geen docenten beschikbaar." : "Geen docenten gevonden."
+    }</p>`;
     return;
   }
   recipientResults.hidden = false;
@@ -651,9 +696,17 @@ function renderRecipientResults(query) {
 async function ensureOntvangers() {
   if (ontvangersLoaded) return;
   const data = /** @type {any} */ (
-    await cyfers.fetch("/rest/v1/medewerkers/ontvangers?additional=vakkenDocentVoorLeerling")
+    await cyfers.fetch("/rest/v1/medewerkers/ontvangers?additional=vakkenDocentVoorLeerling", {
+      headers: { range: "items=0-499" },
+    })
   );
-  const items = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
+  const items = Array.isArray(data?.items)
+    ? data.items
+    : Array.isArray(data?.content)
+      ? data.content
+      : Array.isArray(data)
+        ? data
+        : [];
   /** @type {Ontvanger[]} */
   const mapped = [];
   for (const item of items) {
@@ -667,11 +720,15 @@ async function ensureOntvangers() {
       vakNamen = vakkenRaw.items
         .map((/** @type {any} */ v) => (typeof v?.naam === "string" ? v.naam : typeof v?.afkorting === "string" ? v.afkorting : ""))
         .filter(Boolean);
+    } else if (Array.isArray(vakkenRaw)) {
+      vakNamen = vakkenRaw
+        .map((/** @type {any} */ v) => (typeof v?.naam === "string" ? v.naam : typeof v?.afkorting === "string" ? v.afkorting : ""))
+        .filter(Boolean);
     }
     mapped.push({
       id,
       label,
-      search: `${label} ${vakNamen.join(" ")}`.toLowerCase(),
+      search: foldSearch(`${personSearchText(item, label)} ${vakNamen.join(" ")}`),
       vakken: vakNamen.join(", "),
     });
   }
@@ -773,12 +830,18 @@ async function openComposeSheet(opts = {}) {
     });
   });
   renderRecipientChips();
-  if (composeEl) composeEl.hidden = false;
+  if (composeEl) {
+    composeEl.hidden = false;
+    composeEl.removeAttribute("hidden");
+  }
   composeBody.focus();
 }
 
 function closeCompose() {
-  if (composeEl) composeEl.hidden = true;
+  if (composeEl) {
+    composeEl.hidden = true;
+    composeEl.setAttribute("hidden", "");
+  }
   resetComposeForm();
 }
 
@@ -1079,7 +1142,9 @@ composeBtn?.addEventListener("click", () => {
   void openComposeSheet();
 });
 
-composeClose?.addEventListener("click", () => {
+composeClose?.addEventListener("click", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
   closeCompose();
 });
 
@@ -1104,7 +1169,28 @@ composeForm?.addEventListener("submit", (event) => {
 });
 
 recipientSearch?.addEventListener("input", () => {
-  renderRecipientResults(recipientSearch.value);
+  renderRecipientResults(recipientSearch.value, { allowEmpty: false });
+});
+
+recipientSearch?.addEventListener("focus", () => {
+  void (async () => {
+    try {
+      await ensureOntvangers();
+    } catch (err) {
+      showComposeError(err instanceof Error ? err.message : "Ontvangers laden mislukt.");
+      return;
+    }
+    renderRecipientResults(recipientSearch.value, { allowEmpty: true });
+  })();
+});
+
+recipientSearch?.addEventListener("keydown", (event) => {
+  // Prevent Enter in the search field from submitting the compose form.
+  if (event.key === "Enter") {
+    event.preventDefault();
+    const first = recipientResults?.querySelector("[data-add-id]");
+    if (first instanceof HTMLElement) first.click();
+  }
 });
 
 document.addEventListener("keydown", (event) => {
@@ -1113,4 +1199,6 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
+// Ensure compose starts closed even if CSS previously fought [hidden].
+closeCompose();
 void boot();

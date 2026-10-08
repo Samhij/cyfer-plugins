@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-07T10:32:34Z",
+  "updatedAt": "2026-10-08T09:50:47Z",
   "plugins": [
     {
       "id": "widget-cijfers",
@@ -66,6 +66,31 @@
       },
       "downloadUrl": "",
       "sourceUrl": "https://github.com/cyfers-somtoday/cyfer-plugins/tree/main/plugins/rooster"
+    },
+    {
+      "id": "berichten",
+      "name": "Berichten",
+      "version": "1.0.4",
+      "description": "Inbox, verzonden en concepten; berichten aan docenten sturen en beantwoorden",
+      "author": "Sam Hijmans",
+      "kind": "page",
+      "nav": {
+        "label": "Berichten",
+        "icon": "Mail",
+        "order": 12
+      },
+      "permissions": {
+        "api": [
+          "/rest/v1/account/me",
+          "/rest/v1/boodschappen/conversaties",
+          "/rest/v1/boodschappen/conversatie/*/markeerGelezen",
+          "/rest/v1/medewerkers/ontvangers",
+          "/rest/v1/verstuurdbericht/nieuw",
+          "/rest/v1/verstuurdbericht/reactie"
+        ]
+      },
+      "downloadUrl": "",
+      "sourceUrl": "https://github.com/cyfers-somtoday/cyfer-plugins/tree/main/plugins/berichten"
     },
     {
       "id": "huiswerk",

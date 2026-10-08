@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-08T09:45:37Z",
+  "updatedAt": "2026-10-08T09:47:33Z",
   "plugins": [
     {
       "id": "widget-cijfers",
@@ -70,7 +70,7 @@
     {
       "id": "berichten",
       "name": "Berichten",
-      "version": "1.0.2",
+      "version": "1.0.3",
       "description": "Inbox, verzonden en concepten; berichten aan docenten sturen en beantwoorden",
       "author": "Sam Hijmans",
       "kind": "page",

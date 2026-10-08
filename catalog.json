@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-08T21:50:17Z",
+  "updatedAt": "2026-10-08T21:51:20Z",
   "plugins": [
     {
       "id": "berichten",
@@ -28,7 +28,7 @@
     {
       "id": "widget-cijfers",
       "name": "Cijfers (Widget)",
-      "version": "1.0.2",
+      "version": "1.0.3",
       "description": "Individuele voortgangs- en examencijfers per schooljaar op Overzicht",
       "author": "Sam Hijmans",
       "kind": "widget",

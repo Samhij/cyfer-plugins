@@ -222,10 +222,25 @@
 }
 
 .message-body {
-  white-space: pre-wrap;
   word-break: break-word;
   font-size: 0.95rem;
   line-height: 1.45;
+}
+
+.message-body :where(p, ul, ol, div) {
+  margin: 0 0 0.55rem;
+}
+
+.message-body :where(p, ul, ol, div):last-child {
+  margin-bottom: 0;
+}
+
+.message-body :where(ul, ol) {
+  padding-left: 1.2rem;
+}
+
+.message-body a {
+  color: var(--accent);
 }
 
 .reply-box,

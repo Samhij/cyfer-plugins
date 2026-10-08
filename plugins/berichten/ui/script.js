@@ -159,6 +159,64 @@ function truncate(text, max) {
 }
 
 /**
+ * Strip script/style and event handlers — same approach as huiswerk `sanitizeDescription`.
+ * Somtoday message `inhoud` is HTML (div/br/p/…); never inject raw API HTML.
+ * @param {string} html
+ */
+function sanitizeMessageHtml(html) {
+  const raw = String(html || "").trim();
+  if (!raw) return "";
+  const doc = new DOMParser().parseFromString(`<div>${raw}</div>`, "text/html");
+  const root = doc.body.firstElementChild;
+  if (!root) return escapeHtml(raw);
+
+  root.querySelectorAll("script, style, iframe, object, embed, link, meta").forEach((el) => el.remove());
+  root.querySelectorAll("*").forEach((el) => {
+    [...el.attributes].forEach((attr) => {
+      const name = attr.name.toLowerCase();
+      const value = attr.value || "";
+      if (name.startsWith("on") || name === "style") {
+        el.removeAttribute(attr.name);
+        return;
+      }
+      if ((name === "href" || name === "src") && /^\s*javascript:/i.test(value)) {
+        el.removeAttribute(attr.name);
+      }
+    });
+  });
+  return root.innerHTML.trim();
+}
+
+/**
+ * Plain text for list previews (strip tags from Somtoday HTML inhoud).
+ * @param {string} value
+ */
+function toPlainPreview(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (!/<[a-z][\s\S]*>/i.test(raw)) {
+    return raw.replace(/\s+/g, " ").trim();
+  }
+  const doc = new DOMParser().parseFromString(`<div>${raw}</div>`, "text/html");
+  const text = doc.body.textContent || "";
+  return text.replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Render message body: sanitize HTML from Somtoday, or escape plain-text compose bodies.
+ * @param {string} inhoud
+ */
+function formatMessageBodyHtml(inhoud) {
+  const raw = String(inhoud || "");
+  if (!raw.trim()) return "";
+  if (/<[a-z][\s\S]*>/i.test(raw)) {
+    return sanitizeMessageHtml(raw);
+  }
+  // Plain text (our compose/reply path) — keep newlines readable.
+  return escapeHtml(raw).replaceAll("\n", "<br>");
+}
+
+/**
  * @param {string} value
  */
 function foldSearch(value) {
@@ -297,7 +355,7 @@ function mapConversatie(raw) {
     unread: typeof c.datumOudsteOngelezenBoodschap === "string" && Boolean(c.datumOudsteOngelezenBoodschap),
     markeerId: newest.id,
     boodschappen: byDate,
-    preview: truncate(newest.inhoud, 120),
+    preview: truncate(toPlainPreview(newest.inhoud), 120),
     when: newest.verzendDatum,
     counterpart: counterpart || "—",
     hasReceived,
@@ -378,7 +436,7 @@ function renderList() {
           <button type="button" class="thread-btn${active}" data-draft-id="${escapeHtml(d.id)}">
             <span class="thread-subject">${escapeHtml(d.onderwerp || "(geen onderwerp)")}</span>
             <span class="thread-meta">${escapeHtml(meta)}</span>
-            <span class="thread-preview">${escapeHtml(truncate(d.inhoud, 100) || "Leeg concept")}</span>
+            <span class="thread-preview">${escapeHtml(truncate(toPlainPreview(d.inhoud), 100) || "Leeg concept")}</span>
           </button>
         </li>`;
       })
@@ -453,7 +511,7 @@ function renderDetail() {
         <p class="meta">${aan} · bijgewerkt ${escapeHtml(formatDateTime(draft.updatedAt))}</p>
       </div>
       <div class="message">
-        <div class="message-body">${escapeHtml(draft.inhoud || "")}</div>
+        <div class="message-body">${formatMessageBodyHtml(draft.inhoud || "")}</div>
       </div>
       <div class="draft-actions">
         <div class="draft-actions-row">
@@ -491,7 +549,7 @@ function renderDetail() {
           <span class="message-from">${escapeHtml(from)}</span>
           <span class="message-date">${escapeHtml(formatDateTime(m.verzendDatum))}</span>
         </div>
-        <div class="message-body">${escapeHtml(m.inhoud)}</div>
+        <div class="message-body">${formatMessageBodyHtml(m.inhoud)}</div>
       </article>`;
     })
     .join("");

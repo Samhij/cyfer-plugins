@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1" name="viewport" />
+  <title>Berichten</title>
+  <link href="style.css" rel="stylesheet" />
+</head>
+<body>
+  <header class="toolbar">
+    <div class="toolbar-text">
+      <h1>Berichten</h1>
+      <p class="lede" id="subtitle">Laden…</p>
+    </div>
+    <div class="toolbar-actions" role="group" aria-label="Acties">
+      <button type="button" id="refreshBtn" aria-label="Vernieuwen">Vernieuwen</button>
+      <button type="button" id="composeBtn" class="primary" hidden>Nieuw bericht</button>
+    </div>
+  </header>
+
+  <div id="status" class="muted" hidden></div>
+  <div id="permission" class="empty-state" hidden></div>
+
+  <div id="app" hidden>
+    <nav class="tabs" role="tablist" aria-label="Mappen">
+      <button type="button" class="tab is-active" role="tab" aria-selected="true" data-tab="inbox" id="tab-inbox">
+        Inbox
+      </button>
+      <button type="button" class="tab" role="tab" aria-selected="false" data-tab="sent" id="tab-sent">
+        Verzonden
+      </button>
+      <button type="button" class="tab" role="tab" aria-selected="false" data-tab="drafts" id="tab-drafts">
+        Concepten
+      </button>
+    </nav>
+
+    <div class="layout">
+      <section class="list-pane" aria-label="Lijst">
+        <div id="list" class="thread-list" aria-live="polite"></div>
+      </section>
+
+      <section class="detail-pane" aria-label="Bericht">
+        <div id="detail" class="detail empty">
+          <p class="muted">Selecteer een gesprek of open een concept.</p>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div id="compose" class="compose-sheet" hidden>
+    <div class="compose-panel" role="dialog" aria-modal="true" aria-labelledby="composeTitle">
+      <header class="compose-head">
+        <h2 id="composeTitle">Nieuw bericht</h2>
+        <button type="button" id="composeClose" class="ghost" aria-label="Sluiten">Sluiten</button>
+      </header>
+      <form id="composeForm" class="compose-form">
+        <label class="field">
+          <span>Aan</span>
+          <input type="search" id="recipientSearch" placeholder="Zoek docent…" autocomplete="off" />
+        </label>
+        <div id="recipientChips" class="chips" aria-live="polite"></div>
+        <div id="recipientResults" class="recipient-results" hidden></div>
+        <label class="field">
+          <span>Onderwerp</span>
+          <input type="text" id="composeSubject" maxlength="1024" required />
+        </label>
+        <label class="field">
+          <span>Bericht</span>
+          <textarea id="composeBody" rows="8" required></textarea>
+        </label>
+        <p id="composeError" class="error" hidden></p>
+        <div class="compose-actions">
+          <button type="button" id="saveDraftBtn">Concept opslaan</button>
+          <button type="submit" id="sendBtn" class="primary">Versturen</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

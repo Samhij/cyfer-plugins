@@ -20,4 +20,7 @@ npm run sync:plugin-types
 
 Do **not** put type files inside `plugins/<id>/` — CI only allows `manifest.json` + `ui/`.
 
+Somtoday REST field docs (from leerling-source): see
+[somtoday-login/docs/somtoday-api](https://github.com/cyfers-somtoday/somtoday-login/tree/main/docs/somtoday-api).
+
 For CSS token / class autocomplete, see [`styles/README.md`](../styles/README.md).

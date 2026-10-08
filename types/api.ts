@@ -70,7 +70,10 @@ export type PluginManifest = {
   };
 };
 
-/* —— Raw Somtoday REST shapes (live-checked) —— */
+/* —— Raw Somtoday REST shapes ——
+ * Derived from NONtoday/leerling-source store mappers + Cyfers live usage.
+ * See somtoday-login/docs/somtoday-api/.
+ */
 
 export type SomtodayLink = {
   id?: number | string;
@@ -94,13 +97,15 @@ export type SomtodayEntity = {
   additionalObjects?: Record<string, unknown>;
 };
 
-/** `GET /rest/v1/leerlingen` / `GET /rest/v1/leerlingen/{id}` item. */
+/** `GET /rest/v1/leerlingen` / `GET /rest/v1/leerlingen/{id}` item (`RLeerling`). */
 export type SomtodayStudent = SomtodayEntity & {
   UUID?: string;
   /** Rare; live responses use `UUID`. */
   uuid?: string;
   roepnaam?: string;
+  /** Wire / account payloads may use either spelling. */
   tussenvoegsel?: string;
+  voorvoegsel?: string;
   achternaam?: string;
   leerlingnummer?: number | string;
   email?: string;
@@ -166,7 +171,7 @@ export type SomtodayVak = SomtodayEntity & {
   afkorting?: string;
 };
 
-/** Nested afspraak type on roosters. */
+/** Nested afspraak type on roosters (`/rest/v1/afspraken`). */
 export type SomtodayAfspraakType = SomtodayEntity & {
   naam?: string;
   omschrijving?: string;
@@ -177,7 +182,7 @@ export type SomtodayAfspraakType = SomtodayEntity & {
   actief?: boolean;
 };
 
-/** `GET /rest/v1/afspraken` item. */
+/** `GET /rest/v1/afspraken` item (codegen; rooster UI uses afspraakitems). */
 export type SomtodayAfspraak = SomtodayEntity & {
   beginDatumTijd?: string;
   eindDatumTijd?: string;
@@ -201,7 +206,7 @@ export type SomtodayAfspraak = SomtodayEntity & {
 
 /**
  * Afspraak item type from the student schedule endpoint.
- * Observed in NONtoday/leerling-source (`RAfspraakItem`).
+ * From NONtoday/leerling-source (`RAfspraakItem` / `SAfspraakItem`).
  */
 export type SomtodayAfspraakItemType =
   | "INDIVIDUEEL"
@@ -221,21 +226,75 @@ export type SomtodayStatusNotification = {
   message?: string;
 };
 
+export type SomtodayHerhaalDag =
+  | "MAANDAG"
+  | "DINSDAG"
+  | "WOENSDAG"
+  | "DONDERDAG"
+  | "VRIJDAG"
+  | "ZATERDAG"
+  | "ZONDAG"
+  | "DAG"
+  | "WERKDAG"
+  | string;
+
+/** Recurrence block on afspraakitems / KWT acties (`RHerhalendeAfspraak`). */
+export type SomtodayHerhalendeAfspraak = SomtodayEntity & {
+  beginDatum?: string;
+  eindDatum?: string;
+  maxHerhalingen?: number;
+  type?: "NIET_HERHALEN" | "DAGELIJKS" | "WEKELIJKS" | "MAANDELIJKS" | string;
+  skip?: number;
+  cyclus?: number;
+  afspraakHerhalingDagen?: SomtodayHerhaalDag[];
+};
+
+export type SomtodayKwtInschrijfStatus =
+  | "ONBEPAALD"
+  | "NIET"
+  | "WEL"
+  | "DEFINITIEF"
+  | "VERLOPEN"
+  | string;
+
+/** One KWT choice inside `kwtInfo.afspraakActies` (`RAfspraakActie`). */
+export type SomtodayAfspraakActie = SomtodayEntity & {
+  titel?: string;
+  omschrijving?: string;
+  toegestaan?: boolean;
+  beschikbarePlaatsen?: number;
+  locatie?: string;
+  docentNamen?: string[];
+  ingeschreven?: boolean;
+  inschrijfBeginDatum?: string;
+  inschrijfEindDatum?: string;
+  beginDatumTijd?: string;
+  eindDatumTijd?: string;
+  uitvoerbareActie?: string;
+  vak?: SomtodayVak;
+  herhalendeAfspraak?: SomtodayHerhalendeAfspraak;
+};
+
+/** KWT block on `$type === "participatie.live.RKWTAfspraakItem"`. */
+export type SomtodayKwtInfo = {
+  minimumAantalKeuzes?: number;
+  maximumAantalKeuzes?: number;
+  afspraakActies?: SomtodayAfspraakActie[];
+  inschrijfStatus?: SomtodayKwtInschrijfStatus;
+  kwtSysteem?: "SOMTODAY" | "ZERMELO" | string;
+};
+
 /**
- * `GET /rest/v1/afspraakitems/{studentId}/jaar/{isoYear}/week/{isoWeek}` item.
+ * `GET /rest/v1/afspraakitems/{studentId}/jaar/{isoYear}/week/{isoWeek}` item
+ * (`RAfspraakItem` — leerling-source afspraak-model).
  *
- * Assumptions (inferred from NONtoday leerling app + community clients; not a
- * live-checked Cyfers session):
- * - Response envelope is `{ items?: SomtodayAfspraakItem[], statusNotifications?: … }`.
- * - Cancelled lessons stay in `items` with normal times; look for
- *   `statusNotifications` status `"4007"`, and/or `wijzigingOmschrijving`
- *   like `"Les vervalt"` (normal lessons often use status `"2002"`).
+ * - Envelope: `{ items?: SomtodayAfspraakItem[], statusNotifications?: … }`.
+ * - Cancelled lessons stay in `items`; look for `statusNotifications` /
+ *   item `status` `"4007"`, and/or `wijzigingOmschrijving` like `"Les vervalt"`.
  * - `jaar` / `week` are ISO week-year and ISO week number (Monday-based).
- * - `vak` and `lesgroepen` are top-level (unlike `/rest/v1/afspraken`, which
- *   often nests vak under `additionalObjects`).
- * - Teacher names: `docentNamen`; with `?additional=docentAfkortingen` the
- *   abbreviations may also appear under `additionalObjects.docentAfkortingen`.
- * - Timestamps are local-wall ISO strings without timezone (`YYYY-MM-DDTHH:mm:ss`).
+ * - `vak` and `lesgroepen` are top-level (unlike `/rest/v1/afspraken`).
+ * - Teachers: wire field `docentNamen` (leerling maps this to `medewerkers`).
+ * - Timestamps are often local-wall ISO without timezone (`YYYY-MM-DDTHH:mm:ss`).
  */
 export type SomtodayAfspraakItem = SomtodayEntity & {
   uniqueIdentifier?: string;
@@ -251,8 +310,11 @@ export type SomtodayAfspraakItem = SomtodayEntity & {
   lesgroepen?: SomtodayLesgroep[];
   /** Teacher display names (official leerling client). */
   docentNamen?: string[];
+  herhalendeAfspraak?: SomtodayHerhalendeAfspraak;
   bijlagen?: unknown[];
   aantalToekomstigeHerhalingen?: number;
+  /** Present when `$type` is the KWT live variant (or nested equivalently). */
+  kwtInfo?: SomtodayKwtInfo;
   /**
    * Business status code on some payloads (e.g. `"2002"` normal,
    * `"4001"` inschrijven niet mogelijk). Cancellation is `"4007"` when present.
@@ -269,10 +331,16 @@ export type SomtodayAfspraakItem = SomtodayEntity & {
 };
 
 export type SomtodayAbsentieReden = SomtodayEntity & {
+  /** `Absent` | `Telaat` | `Verwijderd` in leerling-source. */
   absentieSoort?: string;
   afkorting?: string;
   omschrijving?: string;
   geoorloofd?: boolean;
+  kiesbaarDoorVerzorger?: boolean;
+  verzorgerMagTijdstipKiezen?: boolean;
+  verzorgerEinddatumVerplicht?: boolean;
+  standaardAfgehandeld?: boolean;
+  vestiging?: SomtodayEntity & { naam?: string; UUID?: string; uuid?: string };
 };
 
 /** `GET /rest/v1/absentiemeldingen` item. */
@@ -306,18 +374,27 @@ export type SomtodayStudiewijzer = SomtodayEntity & {
   eigenaar?: unknown;
 };
 
+export type SomtodayHuiswerkType = "LESSTOF" | "HUISWERK" | "TOETS" | "GROTE_TOETS" | string;
+
 export type SomtodayStudiewijzerItem = SomtodayEntity & {
   onderwerp?: string;
-  huiswerkType?: string;
+  huiswerkType?: SomtodayHuiswerkType;
   omschrijving?: string;
+  toetsSoort?: { naam?: string; [key: string]: unknown };
   inleverperiodes?: boolean;
   lesmateriaal?: boolean;
   projectgroepen?: boolean;
   bijlagen?: unknown[];
   externeMaterialen?: unknown[];
-  inlevermomenten?: unknown[];
+  inlevermomenten?: Array<{
+    startGeldigheid?: string;
+    eindGeldigheid?: string;
+    [key: string]: unknown;
+  }>;
   tonen?: boolean;
+  notitie?: string;
   notitieZichtbaarVoorLeerling?: boolean;
+  tijdsindicatie?: string;
   leerdoelen?: string;
 };
 
@@ -327,15 +404,125 @@ export type SomtodayStudiewijzerItemAfspraakToekenning = SomtodayEntity & {
   aangemaaktOpDatumTijd?: string;
   sortering?: number;
   studiewijzerItem?: SomtodayStudiewijzerItem;
+  /**
+   * Sometimes present top-level; leerling primarily reads
+   * `additionalObjects.lesgroep`.
+   */
   lesgroep?: SomtodayLesgroep;
+  additionalObjects?: {
+    leerlingen?: { items?: SomtodayStudent[] };
+    /** Wire key used by leerling: `swigemaaktVinkjes`. */
+    swigemaaktVinkjes?: { items?: SomtodaySwiGemaakt[] };
+    lesgroep?: SomtodayLesgroep;
+    leerlingenMetInleveringStatus?: {
+      items?: Array<{
+        leerlingId?: number;
+        status?: "TE_BEOORDELEN" | "IN_BEHANDELING" | "AKKOORD" | "HEROPEND" | string;
+        verzendDatum?: string;
+      }>;
+    };
+    leerlingProjectgroep?: { items?: unknown[] };
+    studiewijzerId?: number | string;
+    [key: string]: unknown;
+  };
 };
 
-/** `GET /rest/v1/account` item. */
+/** Same envelope fields as afspraak-toekenning; week items use `weeknummer` query. */
+export type SomtodayStudiewijzerItemDagToekenning = SomtodayStudiewijzerItemAfspraakToekenning;
+export type SomtodayStudiewijzerItemWeekToekenning = SomtodayStudiewijzerItemAfspraakToekenning;
+
+/** `PUT /rest/v1/swigemaakt/cou` body / response (`RswiGemaakt`). */
+export type SomtodaySwiGemaakt = SomtodayEntity & {
+  leerling?: SomtodayEntity;
+  swiToekenningId?: number;
+  gemaakt?: boolean;
+};
+
+/**
+ * Per-student feature flags from
+ * `GET /rest/v1/account/me?additional=restricties`
+ * (`REloRestricties` under `additionalObjects.restricties.items`).
+ */
+export type SomtodayEloRestricties = {
+  leerlingId?: number;
+  mobieleAppAan?: boolean;
+  studiewijzerAan?: boolean;
+  berichtenVerzendenAan?: boolean;
+  leermiddelenAan?: boolean;
+  adviezenTokenAan?: boolean;
+  opmerkingRapportCijferTonenAan?: boolean;
+  periodeGemiddeldeTonenResultaatAan?: boolean;
+  rapportGemiddeldeTonenResultaatAan?: boolean;
+  rapportCijferTonenResultaatAan?: boolean;
+  toetssoortgemiddeldenAan?: boolean;
+  seResultaatAan?: boolean;
+  stamgroepLeerjaarAan?: boolean;
+  emailWijzigenAan?: boolean;
+  mobielWijzigenAan?: boolean;
+  wachtwoordWijzigenAan?: boolean;
+  absentiesBekijkenAan?: boolean;
+  absentieConstateringBekijkenAan?: boolean;
+  absentieMaatregelBekijkenAan?: boolean;
+  absentieMeldingBekijkenAan?: boolean;
+  berichtenBekijkenAan?: boolean;
+  cijfersBekijkenAan?: boolean;
+  huiswerkBekijkenAan?: boolean;
+  huiswerkWelNietInOrdeTonenAan?: boolean;
+  nieuwsBekijkenAan?: boolean;
+  pasfotoLeerlingTonenAan?: boolean;
+  pasfotoMedewerkerTonenAan?: boolean;
+  profielBekijkenAan?: boolean;
+  roosterBekijkenAan?: boolean;
+  roosterBeschikbaarIcalAan?: boolean;
+  vakkenBekijkenAan?: boolean;
+  lesurenVerbergenSettingAan?: boolean;
+  magAbsentiemeldingMaken?: boolean;
+};
+
+/**
+ * `GET /rest/v1/account/me` (`RAccount`) — bare object, not a list.
+ * Use `?additional=restricties` (and optionally `impersonated`, `adres`).
+ */
 export type SomtodayAccount = SomtodayEntity & {
   gebruikersnaam?: string;
   accountPermissions?: unknown[];
-  persoon?: SomtodayStudent;
+  /** `RLeerling` or `RVerzorger` — check `persoon.links[0].type`. */
+  persoon?: SomtodayStudent | SomtodayEntity;
+  additionalObjects?: {
+    restricties?: { items?: SomtodayEloRestricties[] };
+    impersonated?: boolean;
+    adres?: {
+      straat?: string;
+      huisnummer?: string | number;
+      plaatsnaam?: string;
+      postcode?: string;
+      telefoonnummer?: string;
+      isBuitenlandsAdres?: boolean;
+      land?: string;
+      [key: string]: unknown;
+    };
+    [key: string]: unknown;
+  };
 };
+
+/**
+ * `GET /rest/v1/medewerkers/ontvangers?additional=vakkenDocentVoorLeerling`
+ * (`RMedewerker`).
+ */
+export type SomtodayMedewerker = SomtodayEntity & {
+  afkorting?: string;
+  achternaam?: string;
+  geslacht?: string;
+  voorvoegsel?: string;
+  voorletters?: string;
+  roepnaam?: string;
+  additionalObjects?: {
+    vakkenDocentVoorLeerling?: { items?: SomtodayVak[] };
+    [key: string]: unknown;
+  };
+};
+
+export type SomtodayBoodschapPrioriteit = "URGENT" | "HOOG" | "NORMAAL" | "LAAG" | string;
 
 export type SomtodayBoodschapCorrespondent = {
   $type?: string;
@@ -343,6 +530,8 @@ export type SomtodayBoodschapCorrespondent = {
   sorteerNaam?: string;
   initialen?: string;
   vakken?: SomtodayVak[];
+  /** Client-synthesised when correspondent payload is missing. */
+  isSomtodayAutomatischBericht?: boolean;
 };
 
 export type SomtodayBoodschap = SomtodayEntity & {
@@ -352,6 +541,11 @@ export type SomtodayBoodschap = SomtodayEntity & {
   draft?: boolean;
   onderwerp?: string;
   inhoud?: string;
+  mimeType?: string;
+  prioriteit?: SomtodayBoodschapPrioriteit;
+  notificatieType?: string;
+  /** Wire spelling uses *bijlages* (with e), not bijlagen. */
+  bijlages?: unknown[];
   additionalObjects?: {
     aantalExtraOntvangers?: number;
     verzondenDoorGebruiker?: boolean;
@@ -363,28 +557,30 @@ export type SomtodayBoodschap = SomtodayEntity & {
   };
 };
 
-/** `GET /rest/v1/boodschappen/conversaties` item. */
+/** `GET /rest/v1/boodschappen/conversaties` item (`RBoodschapConversatie`). */
 export type SomtodayBoodschapConversatie = {
   $type?: string;
   boodschappen?: SomtodayBoodschap[];
+  /** ISO timestamp of oldest unread message — unread marker for the thread. */
+  datumOudsteOngelezenBoodschap?: string;
   toekenningVanInleverperiode?: unknown;
 };
 
 export type SomtodayListResponse<T> = {
   items?: T[];
-  /** Envelope-level tips (NONtoday); cancellation may also sit on each item. */
+  /** Envelope-level tips; cancellation may also sit on each item. */
   statusNotifications?: SomtodayStatusNotification[];
 };
 
 /**
  * `GET /rest/v1/vakanties/leerling/{studentId}` item (`participatie.RVakantie`).
  *
- * Documented in NONtoday/somtoday-api-docs (README → Vakanties):
+ * From leerling-source `vakantie-model` (`naam`, `beginDatum`, `eindDatum`):
  * - Envelope is `{ items?: SomtodayVakantie[] }`.
  * - `naam` is the display label (e.g. `"Herfstvakantie"`).
- * - `beginDatum` / `eindDatum` are inclusive whole-day timestamps with offset
- *   (e.g. `"2023-10-16T00:00:00.000+02:00"`). Use the calendar date part;
- *   do not convert via UTC (that can shift the day).
+ * - `beginDatum` / `eindDatum` are inclusive whole-day timestamps (often with
+ *   offset). Use the calendar date part; do not convert via UTC (that can
+ *   shift the day).
  */
 export type SomtodayVakantie = SomtodayEntity & {
   naam?: string;
@@ -395,26 +591,19 @@ export type SomtodayVakantie = SomtodayEntity & {
 /**
  * `GET /rest/v1/resultaatpublicatiemomenten/volgende/leerling/{studentId}`
  *
- * Next delayed-grade publication moment for a student (Somtoday “uitgesteld
- * publiceren”). Singular object — not wrapped in `items`.
- *
- * Live-checked shape (`$type`: `resultaten.RVolgendePublicatieMoment`):
- * - Primary timestamp is `value` (ISO string, often with offset).
- * - `cyfers.fetch` returns this object directly (host proxy unwraps
- *   `{ ok, status, data }` → `data`).
- * - Empty / no schedule: null body, missing `value`, or non-OK proxy status
- *   (schools on “direct publiceren”).
- * - Optional `naam` / older datetime field names kept as defensive fallbacks.
+ * Next delayed-grade publication moment (“uitgesteld publiceren”). Bare object
+ * — not wrapped in `items`. **Not called by leerling-source** in the examined
+ * snapshot; used by Cyfers pack-opening. Live shape often has `$type`
+ * `resultaten.RVolgendePublicatieMoment` with primary field `value`.
  */
 export type SomtodayResultaatPublicatieMoment = SomtodayEntity & {
-  /** Next reveal timestamp (ISO). Live field on `RVolgendePublicatieMoment`. */
+  /** Next reveal timestamp (ISO). */
   value?: string;
-  /** Older / related Somtoday datetime names — parsers may check these. */
+  /** Defensive fallbacks seen on related Somtoday datetime fields. */
   datumTijd?: string;
   publicatieDatumTijd?: string;
   tijdstip?: string;
   beginDatumTijd?: string;
-  /** Optional label (e.g. one-off extra publicatiemoment). */
   naam?: string;
 };
 

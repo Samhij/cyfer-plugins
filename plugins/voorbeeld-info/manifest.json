@@ -9,10 +9,11 @@
   "listed": false,
   "nav": {
     "label": "Voorbeeld",
-    "icon": "Sparkles",
-    "order": 90
+    "icon": "Sparkles"
   },
   "permissions": {
-    "api": ["/rest/v1/leerlingen"]
+    "api": [
+      "/rest/v1/leerlingen"
+    ]
   }
 }

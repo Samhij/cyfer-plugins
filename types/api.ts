@@ -48,7 +48,11 @@ export type PluginKind = "page" | "widget";
 export type PluginNav = {
   label: string;
   icon: string;
-  order: number;
+  /**
+   * Deprecated / ignored for sidebar order. Cyfers lets the user set plugin
+   * order in the host app; do not set this in new manifests.
+   */
+  order?: number;
 };
 
 /** Shape of `manifest.json` (validated by the Cyfers host on install). */

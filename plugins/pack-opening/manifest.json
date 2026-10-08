@@ -8,8 +8,7 @@
   "entry": "ui/index.html",
   "nav": {
     "label": "Packs",
-    "icon": "PackageOpen",
-    "order": 20
+    "icon": "PackageOpen"
   },
   "permissions": {
     "api": [

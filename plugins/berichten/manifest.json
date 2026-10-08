@@ -8,8 +8,7 @@
   "entry": "ui/index.html",
   "nav": {
     "label": "Berichten",
-    "icon": "Mail",
-    "order": 12
+    "icon": "Mail"
   },
   "permissions": {
     "api": [

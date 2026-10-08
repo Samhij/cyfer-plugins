@@ -8,8 +8,7 @@
   "entry": "ui/index.html",
   "nav": {
     "label": "Huiswerk",
-    "icon": "NotebookPen",
-    "order": 15
+    "icon": "NotebookPen"
   },
   "permissions": {
     "api": [

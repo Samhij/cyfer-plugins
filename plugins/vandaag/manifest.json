@@ -8,8 +8,7 @@
   "entry": "ui/index.html",
   "nav": {
     "label": "Vandaag",
-    "icon": "Clock",
-    "order": 5
+    "icon": "Clock"
   },
   "permissions": {
     "api": [

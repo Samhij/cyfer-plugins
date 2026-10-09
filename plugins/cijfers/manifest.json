@@ -1,7 +1,7 @@
 {
   "id": "cijfers",
   "name": "Cijfers (Pagina)",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Laatste cijfers en vakgemiddelden met rekenhulpen voor het volgende resultaat",
   "author": "Sam Hijmans",
   "kind": "page",

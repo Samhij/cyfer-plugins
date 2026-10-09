@@ -5,6 +5,8 @@ const statusEl = /** @type {HTMLElement} */ (document.getElementById("status"));
 /** @type {HTMLElement} */
 const subtitleEl = /** @type {HTMLElement} */ (document.getElementById("subtitle"));
 /** @type {HTMLElement} */
+const revealCountdownEl = /** @type {HTMLElement} */ (document.getElementById("revealCountdown"));
+/** @type {HTMLElement} */
 const latestList = /** @type {HTMLElement} */ (document.getElementById("latestList"));
 /** @type {HTMLElement} */
 const subjectList = /** @type {HTMLElement} */ (document.getElementById("subjectList"));
@@ -138,6 +140,16 @@ const state = {
   calcDossier: "voortgang",
   /** @type {{ voortgang: CalcStats, examen: CalcStats }} */
   calcByDossier: emptyCalcByDossier(),
+  /** Next uitgestelde publicatie (`resultaatpublicatiemomenten/volgende`). */
+  /** @type {Date | null} */
+  momentAt: null,
+  momentLabel: "",
+  /** @type {"idle" | "loading" | "ready" | "empty"} */
+  momentStatus: "idle",
+  /** @type {ReturnType<typeof setInterval> | null} */
+  countdownTimer: null,
+  zeroHandledFor: "",
+  momentSeq: 0,
   loadSeq: 0,
   detailSeq: 0,
 };
@@ -641,6 +653,163 @@ function showMain() {
   state.activeSubject = null;
   state.calcByDossier = emptyCalcByDossier();
   state.calcDossier = "voortgang";
+  paintRevealCountdown();
+}
+
+/**
+ * @param {unknown} raw
+ * @returns {Date | null}
+ */
+function parseMomentDate(raw) {
+  if (raw == null || raw === "") return null;
+  if (typeof raw !== "string" && typeof raw !== "number") return null;
+  const d = new Date(raw);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * Same payload parsing as pack-opening (`resultaten.RVolgendePublicatieMoment`).
+ * @param {unknown} raw
+ * @returns {{ at: Date | null, label: string }}
+ */
+function parsePublicatieMoment(raw) {
+  if (raw == null || raw === "") return { at: null, label: "" };
+  if (typeof raw === "string") return { at: parseMomentDate(raw), label: "" };
+  if (typeof raw !== "object") return { at: null, label: "" };
+  /** @type {Record<string, unknown>} */
+  const obj = /** @type {any} */ (raw);
+  if (Array.isArray(obj.items) && obj.items.length) return parsePublicatieMoment(obj.items[0]);
+  const label = typeof obj.naam === "string" ? obj.naam.trim() : "";
+  for (const key of ["value", "datumTijd", "publicatieDatumTijd", "tijdstip", "beginDatumTijd", "datum"]) {
+    const at = parseMomentDate(obj[key]);
+    if (at) return { at, label };
+  }
+  return { at: null, label };
+}
+
+/** @param {number} studentId */
+async function fetchNextMoment(studentId) {
+  /** @type {SomtodayResultaatPublicatieMoment | null} */
+  const data = /** @type {any} */ (
+    await cyfers.fetch(`/rest/v1/resultaatpublicatiemomenten/volgende/leerling/${studentId}`)
+  );
+  return parsePublicatieMoment(data);
+}
+
+function stopCountdownTick() {
+  if (state.countdownTimer != null) {
+    clearInterval(state.countdownTimer);
+    state.countdownTimer = null;
+  }
+}
+
+function startCountdownTick() {
+  stopCountdownTick();
+  state.countdownTimer = setInterval(() => {
+    paintRevealCountdown();
+  }, 1000);
+}
+
+/** @param {number} totalMs */
+function formatRemaining(totalMs) {
+  const sec = Math.max(0, Math.floor(totalMs / 1000));
+  const days = Math.floor(sec / 86400);
+  const hours = Math.floor((sec % 86400) / 3600);
+  const minutes = Math.floor((sec % 3600) / 60);
+  const seconds = sec % 60;
+  const parts = [];
+  if (days > 0) parts.push(`${days}d`);
+  parts.push(`${hours}u`);
+  parts.push(`${String(minutes).padStart(2, "0")}m`);
+  parts.push(`${String(seconds).padStart(2, "0")}s`);
+  return parts.join(" ");
+}
+
+/** @param {Date} at */
+function formatMomentWhen(at) {
+  return at.toLocaleString("nl-NL", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function paintRevealCountdown() {
+  const el = revealCountdownEl;
+  if (!el) return;
+
+  // Only for current school year, and not on subject detail.
+  if (!state.plaatsingHuidig || !detailView.hidden || state.momentStatus === "idle" || state.momentStatus === "loading") {
+    el.hidden = true;
+    return;
+  }
+
+  if (state.momentStatus === "empty" || !state.momentAt) {
+    el.hidden = true;
+    return;
+  }
+
+  el.hidden = false;
+  el.classList.remove("is-due");
+  const remaining = state.momentAt.getTime() - Date.now();
+  const when = formatMomentWhen(state.momentAt);
+  const labelBit = state.momentLabel ? ` · ${escapeHtml(state.momentLabel)}` : "";
+
+  if (remaining <= 0) {
+    el.classList.add("is-due");
+    el.innerHTML = `Publicatiemoment bereikt — nieuwe cijfers kunnen binnenkomen${labelBit}`;
+    const key = state.momentAt.toISOString();
+    if (state.zeroHandledFor !== key) {
+      state.zeroHandledFor = key;
+      void onRevealCountdownZero();
+    }
+    return;
+  }
+
+  el.innerHTML =
+    `Volgende publicatie over <strong>${escapeHtml(formatRemaining(remaining))}</strong>` +
+    ` · ${escapeHtml(when)}${labelBit}`;
+}
+
+async function onRevealCountdownZero() {
+  if (state.studentId == null) return;
+  await refreshMoment(state.studentId);
+  await loadAll();
+  setStatus("Publicatiemoment bereikt — cijfers vernieuwd.", "muted");
+}
+
+/** @param {number} studentId */
+async function refreshMoment(studentId) {
+  const seq = ++state.momentSeq;
+  state.momentStatus = "loading";
+  paintRevealCountdown();
+  try {
+    const { at, label } = await fetchNextMoment(studentId);
+    if (seq !== state.momentSeq) return;
+    state.momentAt = at;
+    state.momentLabel = label;
+    if (!at) {
+      state.momentStatus = "empty";
+      stopCountdownTick();
+    } else if (at.getTime() <= Date.now()) {
+      state.momentStatus = "ready";
+      state.zeroHandledFor = at.toISOString();
+      startCountdownTick();
+    } else {
+      state.momentStatus = "ready";
+      state.zeroHandledFor = "";
+      startCountdownTick();
+    }
+  } catch {
+    if (seq !== state.momentSeq) return;
+    state.momentAt = null;
+    state.momentLabel = "";
+    state.momentStatus = "empty";
+    stopCountdownTick();
+  }
+  paintRevealCountdown();
 }
 
 /**
@@ -723,6 +892,7 @@ async function openSubject(subject) {
   state.activeSubject = subject;
   mainView.hidden = true;
   detailView.hidden = false;
+  paintRevealCountdown();
   detailTitle.textContent = subject.name;
   const avgParts = [];
   if (subject.voortgangAvg) avgParts.push(`Voortgang ${subject.voortgangAvg}`);
@@ -943,6 +1113,7 @@ function registerEventListeners() {
   });
 
   document.getElementById("refreshBtn")?.addEventListener("click", () => {
+    if (state.studentId != null && state.plaatsingHuidig) void refreshMoment(state.studentId);
     void loadAll();
   });
 
@@ -957,6 +1128,13 @@ function registerEventListeners() {
     const selected = state.plaatsingen.find((p) => plaatsingKeyOf(p) === next);
     state.plaatsingHuidig = Boolean(selected?.huidig);
     showMain();
+    if (state.studentId != null && state.plaatsingHuidig) void refreshMoment(state.studentId);
+    else {
+      stopCountdownTick();
+      state.momentStatus = "idle";
+      state.momentAt = null;
+      paintRevealCountdown();
+    }
     void loadAll();
   });
 
@@ -1010,6 +1188,7 @@ async function main() {
       return;
     }
 
+    if (state.plaatsingHuidig) void refreshMoment(studentId);
     await loadAll();
   } catch (error) {
     const message = error instanceof Error ? error.message : "Laden mislukt.";

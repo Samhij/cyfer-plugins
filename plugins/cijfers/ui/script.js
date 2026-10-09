@@ -574,7 +574,10 @@ function gradeRowHtml(item, opts = {}) {
     `<span>${escapeHtml(dateOf(grade))}</span>`,
   ];
   if (title) metaBits.push(`<span>${escapeHtml(title)}</span>`);
-  if (weight != null) metaBits.push(`<span>×${escapeHtml(String(weight))}</span>`);
+  const weightHtml =
+    weight != null
+      ? `<span class="grade-weging">×${escapeHtml(String(weight))}</span>`
+      : "";
 
   return `
     <article class="grade-row${dossier === "examen" ? " is-examen" : ""}">
@@ -582,7 +585,10 @@ function gradeRowHtml(item, opts = {}) {
         ${subjectLine}
         <div class="grade-meta">${metaBits.join("")}</div>
       </div>
-      <div class="grade-score${fail ? " is-fail" : ""}">${escapeHtml(score)}</div>
+      <div class="grade-side">
+        <div class="grade-score${fail ? " is-fail" : ""}">${escapeHtml(score)}</div>
+        ${weightHtml}
+      </div>
     </article>
   `;
 }

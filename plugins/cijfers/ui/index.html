@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1" name="viewport" />
+  <title>Cijfers</title>
+  <link href="style.css" rel="stylesheet" />
+</head>
+<body>
+  <header class="toolbar">
+    <div class="toolbar-text">
+      <h1>Cijfers</h1>
+      <p class="lede" id="subtitle">Laden…</p>
+    </div>
+    <div class="toolbar-actions">
+      <label class="year-label">
+        <span class="sr-only">Schooljaar</span>
+        <select id="yearPick" aria-label="Schooljaar" disabled>
+          <option value="">Schooljaar laden…</option>
+        </select>
+      </label>
+      <button type="button" id="refreshBtn" aria-label="Vernieuwen">Vernieuwen</button>
+    </div>
+  </header>
+
+  <div id="status" class="muted" hidden></div>
+
+  <div id="mainView">
+    <nav class="tabs" role="tablist" aria-label="Weergaven">
+      <button type="button" class="tab is-active" role="tab" aria-selected="true" data-tab="latest" id="tab-latest">
+        Laatste cijfers
+      </button>
+      <button type="button" class="tab" role="tab" aria-selected="false" data-tab="subjects" id="tab-subjects">
+        Vakken
+      </button>
+    </nav>
+
+    <section id="panel-latest" class="panel" role="tabpanel" aria-labelledby="tab-latest">
+      <div id="latestList" class="grade-list" aria-live="polite"></div>
+    </section>
+
+    <section id="panel-subjects" class="panel" role="tabpanel" aria-labelledby="tab-subjects" hidden>
+      <div id="subjectList" class="subject-list" aria-live="polite"></div>
+      <div id="combinedAverage" class="combined" hidden>
+        <span class="combined-label">Totaalgemiddelde</span>
+        <span class="combined-value" id="combinedValue">—</span>
+      </div>
+    </section>
+  </div>
+
+  <div id="detailView" hidden>
+    <button type="button" id="backBtn" class="back-btn">← Terug naar vakken</button>
+    <header class="detail-head">
+      <h2 id="detailTitle">Vak</h2>
+      <p class="detail-avg muted" id="detailAvg"></p>
+    </header>
+    <div id="detailStatus" class="muted" hidden></div>
+    <div id="detailGrades" class="grade-list" aria-live="polite"></div>
+
+    <section class="calculators" aria-label="Rekenhulpen">
+      <h3>Rekenhulpen</h3>
+      <p class="calc-intro muted">
+        Op basis van je huidige voortgangsgemiddelde en het totale gewicht van de cijfers.
+        Alleen numerieke cijfers tellen mee.
+      </p>
+
+      <div class="calc-grid">
+        <form id="calcNewAvg" class="calc-card" novalidate>
+          <h4>Nieuw gemiddelde</h4>
+          <p class="muted calc-hint">Wat wordt je gemiddelde als je dit cijfer haalt?</p>
+          <label class="field">
+            <span>Cijfer</span>
+            <input type="number" id="newGrade" min="1" max="10" step="0.1" required placeholder="bijv. 7,5" />
+          </label>
+          <label class="field">
+            <span>Weging</span>
+            <input type="number" id="newWeight" min="0.1" step="0.1" required placeholder="bijv. 2" />
+          </label>
+          <p class="calc-result" id="newAvgResult" aria-live="polite"></p>
+        </form>
+
+        <form id="calcNeeded" class="calc-card" novalidate>
+          <h4>Benodigd cijfer</h4>
+          <p class="muted calc-hint">Welk cijfer heb je nodig voor dit gemiddelde?</p>
+          <label class="field">
+            <span>Gewenst gemiddelde</span>
+            <input type="number" id="desiredAvg" min="1" max="10" step="0.1" required placeholder="bijv. 6,5" />
+          </label>
+          <label class="field">
+            <span>Weging volgende toets</span>
+            <input type="number" id="neededWeight" min="0.1" step="0.1" required placeholder="bijv. 2" />
+          </label>
+          <p class="calc-result" id="neededResult" aria-live="polite"></p>
+        </form>
+      </div>
+    </section>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

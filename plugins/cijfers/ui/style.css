@@ -276,8 +276,57 @@
   border-top: 1px solid var(--line);
 }
 
-.calculators h3 {
+.calc-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem 1rem;
   margin-bottom: 0.35rem;
+}
+
+.calculators h3 {
+  margin: 0;
+}
+
+.dossier-toggle {
+  display: inline-flex;
+  gap: 0;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--bg-elevated);
+}
+
+.dossier-toggle[hidden] {
+  display: none !important;
+}
+
+.dossier-btn {
+  padding: 0.28rem 0.65rem;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.dossier-btn + .dossier-btn {
+  border-left: 1px solid var(--line);
+}
+
+.dossier-btn.is-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.dossier-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .calc-intro {

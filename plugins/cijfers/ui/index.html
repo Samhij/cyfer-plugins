@@ -58,9 +58,21 @@
     <div id="detailGrades" class="grade-list" aria-live="polite"></div>
 
     <section class="calculators" aria-label="Rekenhulpen">
-      <h3>Rekenhulpen</h3>
-      <p class="calc-intro muted">
-        Op basis van je huidige voortgangsgemiddelde en het totale gewicht van de cijfers.
+      <div class="calc-head">
+        <h3>Rekenhulpen</h3>
+        <div
+          id="calcDossier"
+          class="dossier-toggle"
+          role="group"
+          aria-label="Dossier voor rekenhulpen"
+          hidden
+        >
+          <button type="button" class="dossier-btn is-active" data-dossier="voortgang">Voortgang</button>
+          <button type="button" class="dossier-btn" data-dossier="examen">Examen</button>
+        </div>
+      </div>
+      <p class="calc-intro muted" id="calcIntro">
+        Op basis van het gekozen dossiergemiddelde en het totale gewicht van die cijfers.
         Alleen numerieke cijfers tellen mee.
       </p>
 

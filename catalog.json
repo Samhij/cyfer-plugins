@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-09T09:21:02Z",
+  "updatedAt": "2026-10-09T09:29:15Z",
   "plugins": [
     {
       "id": "berichten",
@@ -28,7 +28,7 @@
     {
       "id": "cijfers",
       "name": "Cijfers (Pagina)",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "description": "Laatste cijfers en vakgemiddelden met rekenhulpen voor het volgende resultaat",
       "author": "Sam Hijmans",
       "kind": "page",

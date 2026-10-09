@@ -92,9 +92,25 @@ const GRADE_COLUMN_TYPES = new Set([
  *   voortgangAvg: string | null,
  *   examenAvg: string | null,
  *   voortgangNumeric: number | null,
+ *   examenNumeric: number | null,
  *   raw: SomtodayVakGemiddelde,
  * }} SubjectRow
  */
+
+/**
+ * @typedef {{
+ *   avg: number | null,
+ *   totalWeight: number,
+ * }} CalcStats
+ */
+
+/** @returns {{ voortgang: CalcStats, examen: CalcStats }} */
+function emptyCalcByDossier() {
+  return {
+    voortgang: { avg: null, totalWeight: 0 },
+    examen: { avg: null, totalWeight: 0 },
+  };
+}
 
 const state = {
   /** @type {number | null} */
@@ -114,10 +130,10 @@ const state = {
   combinedAvg: null,
   /** @type {SubjectRow | null} */
   activeSubject: null,
-  /** Current weighted avg for calculator (voortgang). */
-  calcAvg: /** @type {number | null} */ (null),
-  /** Total weging of numeric voortgang grades. */
-  calcWeight: /** @type {number | null} */ (null),
+  /** @type {"voortgang" | "examen"} */
+  calcDossier: "voortgang",
+  /** @type {{ voortgang: CalcStats, examen: CalcStats }} */
+  calcByDossier: emptyCalcByDossier(),
   loadSeq: 0,
   detailSeq: 0,
 };
@@ -329,6 +345,7 @@ function subjectsFromGemiddelden(items) {
       voortgangAvg: avgDisplayOf(item.voortgangsdossierResultaat),
       examenAvg: avgDisplayOf(item.examendossierResultaat),
       voortgangNumeric: avgNumericOf(item.voortgangsdossierResultaat),
+      examenNumeric: avgNumericOf(item.examendossierResultaat),
       raw: item,
     });
   }
@@ -582,11 +599,13 @@ function showMain() {
   mainView.hidden = false;
   detailView.hidden = true;
   state.activeSubject = null;
+  state.calcByDossier = emptyCalcByDossier();
+  state.calcDossier = "voortgang";
 }
 
 /**
  * @param {SomtodayGrade[]} grades
- * @returns {{ avg: number | null, totalWeight: number }}
+ * @returns {CalcStats}
  */
 function weightedStats(grades) {
   let sum = 0;
@@ -604,6 +623,57 @@ function weightedStats(grades) {
   return { avg: sum / totalWeight, totalWeight };
 }
 
+/** @param {CalcStats} stats */
+function dossierUsable(stats) {
+  return stats.avg != null && stats.totalWeight > 0;
+}
+
+/**
+ * Prefer voortgang when usable; otherwise examen; otherwise leave current if still usable.
+ */
+function pickDefaultCalcDossier() {
+  const v = state.calcByDossier.voortgang;
+  const e = state.calcByDossier.examen;
+  if (dossierUsable(v)) return "voortgang";
+  if (dossierUsable(e)) return "examen";
+  if (v.avg != null) return "voortgang";
+  if (e.avg != null) return "examen";
+  return "voortgang";
+}
+
+function syncCalcDossierToggle() {
+  const toggle = document.getElementById("calcDossier");
+  if (!toggle) return;
+  const vOk = dossierUsable(state.calcByDossier.voortgang) || state.calcByDossier.voortgang.avg != null;
+  const eOk = dossierUsable(state.calcByDossier.examen) || state.calcByDossier.examen.avg != null;
+  const show = vOk && eOk;
+  toggle.hidden = !show;
+
+  for (const btn of toggle.querySelectorAll(".dossier-btn")) {
+    const dossier = /** @type {"voortgang" | "examen"} */ (btn.getAttribute("data-dossier"));
+    const ok = dossier === "voortgang" ? vOk : eOk;
+    btn.disabled = !ok;
+    btn.classList.toggle("is-active", dossier === state.calcDossier);
+  }
+
+  const intro = document.getElementById("calcIntro");
+  if (intro) {
+    const label = state.calcDossier === "examen" ? "examen" : "voortgang";
+    intro.textContent =
+      `Op basis van je ${label}gemiddelde en het totale gewicht van die cijfers. ` +
+      "Alleen numerieke cijfers tellen mee.";
+  }
+}
+
+/** @param {"voortgang" | "examen"} dossier */
+function setCalcDossier(dossier) {
+  const stats = state.calcByDossier[dossier];
+  if (!dossierUsable(stats) && stats.avg == null) return;
+  state.calcDossier = dossier;
+  syncCalcDossierToggle();
+  updateCalculators();
+}
+
 /**
  * @param {SubjectRow} subject
  */
@@ -619,8 +689,13 @@ async function openSubject(subject) {
   detailAvg.textContent = avgParts.length ? avgParts.join(" · ") : "Geen gemiddelde";
   detailGrades.innerHTML = `<p class="empty-row muted">Cijfers laden…</p>`;
   setDetailStatus("");
-  state.calcAvg = subject.voortgangNumeric;
-  state.calcWeight = null;
+
+  state.calcByDossier = {
+    voortgang: { avg: subject.voortgangNumeric, totalWeight: 0 },
+    examen: { avg: subject.examenNumeric, totalWeight: 0 },
+  };
+  state.calcDossier = pickDefaultCalcDossier();
+  syncCalcDossierToggle();
   updateCalculators();
 
   const studentId = state.studentId;
@@ -654,11 +729,18 @@ async function openSubject(subject) {
     if (progress.status === "fulfilled") {
       rows.push(...tagGrades(progress.value, "voortgang"));
       const stats = weightedStats(progress.value);
-      if (stats.avg != null) state.calcAvg = stats.avg;
-      if (stats.totalWeight > 0) state.calcWeight = stats.totalWeight;
+      state.calcByDossier.voortgang = {
+        avg: stats.avg ?? subject.voortgangNumeric,
+        totalWeight: stats.totalWeight,
+      };
     }
     if (exams.status === "fulfilled") {
       rows.push(...tagGrades(exams.value, "examen"));
+      const stats = weightedStats(exams.value);
+      state.calcByDossier.examen = {
+        avg: stats.avg ?? subject.examenNumeric,
+        totalWeight: stats.totalWeight,
+      };
     }
     if (progress.status === "rejected" && exams.status === "rejected") {
       throw new Error("Kon cijfers voor dit vak niet laden.");
@@ -666,6 +748,9 @@ async function openSubject(subject) {
     if (progress.status === "rejected" || exams.status === "rejected") {
       setDetailStatus("Niet alle dossiers konden worden geladen.", "muted");
     }
+
+    state.calcDossier = pickDefaultCalcDossier();
+    syncCalcDossierToggle();
 
     rows.sort(byDateDesc);
     if (!rows.length) {
@@ -693,13 +778,15 @@ function updateCalculators() {
   const neededResult = document.getElementById("neededResult");
   if (!newResult || !neededResult) return;
 
-  const avg = state.calcAvg;
-  const weightTotal = state.calcWeight;
+  const stats = state.calcByDossier[state.calcDossier];
+  const avg = stats.avg;
+  const weightTotal = stats.totalWeight;
+  const dossierLabel = state.calcDossier === "examen" ? "examen" : "voortgang";
 
-  if (avg == null || weightTotal == null || weightTotal <= 0) {
+  if (avg == null || weightTotal <= 0) {
     const msg =
       avg == null
-        ? "Geen numeriek voortgangsgemiddelde beschikbaar."
+        ? `Geen numeriek ${dossierLabel}gemiddelde beschikbaar.`
         : "Geen wegingen gevonden — rekenhulp niet mogelijk.";
     newResult.textContent = msg;
     newResult.className = "calc-result is-error";
@@ -844,6 +931,14 @@ function registerEventListeners() {
   for (const id of ["newGrade", "newWeight", "desiredAvg", "neededWeight"]) {
     document.getElementById(id)?.addEventListener("input", updateCalculators);
   }
+
+  document.getElementById("calcDossier")?.addEventListener("click", (event) => {
+    const target = /** @type {HTMLElement} */ (event.target);
+    const btn = target.closest(".dossier-btn");
+    if (!btn || !(btn instanceof HTMLButtonElement) || btn.disabled) return;
+    const dossier = btn.getAttribute("data-dossier");
+    if (dossier === "voortgang" || dossier === "examen") setCalcDossier(dossier);
+  });
 
   document.getElementById("calcNewAvg")?.addEventListener("submit", (e) => e.preventDefault());
   document.getElementById("calcNeeded")?.addEventListener("submit", (e) => e.preventDefault());

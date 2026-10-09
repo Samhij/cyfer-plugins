@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-09T09:34:39Z",
+  "updatedAt": "2026-10-09T11:30:43Z",
   "plugins": [
     {
       "id": "berichten",
@@ -28,7 +28,7 @@
     {
       "id": "cijfers",
       "name": "Cijfers (Pagina)",
-      "version": "1.0.2",
+      "version": "1.0.3",
       "description": "Laatste cijfers en vakgemiddelden met rekenhulpen voor het volgende resultaat",
       "author": "Sam Hijmans",
       "kind": "page",
@@ -43,7 +43,8 @@
           "/rest/v1/geldendvoortgangsdossierresultaten/leerling/*",
           "/rest/v1/geldendexamendossierresultaten/leerling/*",
           "/rest/v1/geldendvoortgangsdossierresultaten/vakresultaten/*/vak/*/lichting/*",
-          "/rest/v1/geldendexamendossierresultaten/vakresultaten/*/vak/*/lichting/*"
+          "/rest/v1/geldendexamendossierresultaten/vakresultaten/*/vak/*/lichting/*",
+          "/rest/v1/resultaatpublicatiemomenten/volgende/leerling/*"
         ]
       },
       "downloadUrl": "",

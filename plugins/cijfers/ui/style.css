@@ -64,6 +64,29 @@
   border-radius: 2px;
 }
 
+/* Quiet next-publicatiemoment line (same API as pack-opening; no spectacle). */
+.reveal-cd {
+  margin: 0 0 0.95rem;
+  padding: 0.45rem 0 0.65rem;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.reveal-cd[hidden] {
+  display: none !important;
+}
+
+.reveal-cd strong {
+  color: var(--ink);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.reveal-cd.is-due {
+  color: var(--ink);
+}
+
 .tabs {
   display: flex;
   flex-wrap: wrap;

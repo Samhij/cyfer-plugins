@@ -66,14 +66,18 @@ const VAK_QUERY = [
   "sort=desc-geldendResultaatCijferInvoer",
 ].join("&");
 
-/** Real grade columns (not periode-/rapport-/SE-/toetssoort-gemiddelden). */
+/**
+ * Individual toets columns shown in lists — mirrors leerling-source
+ * `TOETS_TOETSTYPEN` (+ DeeltoetsKolom from the latest-results query).
+ * Excludes periode-/rapport-/SE-/toetssoort-gemiddelden and RapportCijferKolom
+ * (those are period summaries, not toets rows).
+ */
 const GRADE_COLUMN_TYPES = new Set([
   "Toetskolom",
   "DeeltoetsKolom",
   "SamengesteldeToetsKolom",
   "Werkstukcijferkolom",
   "Advieskolom",
-  "RapportCijferKolom",
   "RapportToetskolom",
 ]);
 
@@ -252,16 +256,53 @@ function dateOf(grade) {
 
 /** @param {SomtodayGrade} grade */
 function columnTitleOf(grade) {
+  const omschrijving = typeof grade.omschrijving === "string" ? grade.omschrijving.trim() : "";
+  if (omschrijving) return omschrijving;
   const kolom = grade.additionalObjects?.resultaatkolom;
-  if (typeof kolom === "string" && kolom) return kolom;
-  if (kolom && typeof kolom === "object") return kolom.naam || kolom.omschrijving || "";
-  return grade.omschrijving || grade.toetscode || grade.toetssoort || "";
+  // leerling-source: additional `resultaatkolom` is a numeric column id — not a title.
+  if (typeof kolom === "string" && kolom && !/^\d+$/.test(kolom)) return kolom;
+  if (kolom && typeof kolom === "object") {
+    return kolom.naam || kolom.omschrijving || "";
+  }
+  return grade.toetscode || grade.toetssoort || "";
 }
 
 /** @param {SomtodayGrade} grade */
 function isGradeColumn(grade) {
   if (!grade?.type) return true;
   return GRADE_COLUMN_TYPES.has(grade.type);
+}
+
+/** @param {SomtodayGrade} grade */
+function hasEntryDate(grade) {
+  return Boolean(dateRawOf(grade));
+}
+
+/** @param {SomtodayGrade} grade */
+function hasWeging(grade) {
+  return grade.weging != null && grade.weging !== "" && Number.isFinite(Number(grade.weging));
+}
+
+/**
+ * Cross-subject import (`RLeerlingAnderVakKolom`) — shows up under other vakken.
+ * @param {SomtodayGrade} grade
+ */
+function isAnderVakImport(grade) {
+  return Boolean(/** @type {{ resultaatAnderVakKolom?: unknown }} */ (grade).resultaatAnderVakKolom);
+}
+
+/**
+ * Keep real individual toetsresultaten; drop placeholders / incomplete rows that
+ * leak into vakresultaten (no datumInvoer*, no weging, often only a resultaatkolom id).
+ * @param {SomtodayGrade} grade
+ */
+function isListableGrade(grade) {
+  if (!isGradeColumn(grade)) return false;
+  if (!scoreOf(grade)) return false;
+  if (isAnderVakImport(grade)) return false;
+  // Incomplete / non-cijfer shells: missing both entry date and weging.
+  if (!hasEntryDate(grade) && !hasWeging(grade)) return false;
+  return true;
 }
 
 /** @param {SomtodayGrade | undefined} result */
@@ -404,8 +445,7 @@ function tagGrades(items, dossier) {
   /** @type {TaggedGrade[]} */
   const out = [];
   for (const grade of items) {
-    if (!isGradeColumn(grade)) continue;
-    if (!scoreOf(grade)) continue;
+    if (!isListableGrade(grade)) continue;
     out.push({ dossier, grade });
   }
   return out;
@@ -611,10 +651,11 @@ function weightedStats(grades) {
   let sum = 0;
   let totalWeight = 0;
   for (const g of grades) {
-    if (!isGradeColumn(g)) continue;
+    if (!isListableGrade(g)) continue;
     const score = numericScoreOf(g);
     if (score == null) continue;
-    const w = g.weging != null && Number.isFinite(Number(g.weging)) ? Number(g.weging) : 1;
+    if (!hasWeging(g)) continue;
+    const w = Number(g.weging);
     if (w <= 0) continue;
     sum += score * w;
     totalWeight += w;

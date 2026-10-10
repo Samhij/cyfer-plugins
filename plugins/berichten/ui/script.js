@@ -24,6 +24,16 @@
 /**
  * @typedef {{
  *   id: number,
+ *   omschrijving: string,
+ *   fileUrl: string,
+ *   fileExtension: string,
+ *   fileSize: number,
+ * }} Bijlage
+ */
+
+/**
+ * @typedef {{
+ *   id: number,
  *   onderwerp: string,
  *   inhoud: string,
  *   verzendDatum: string | null,
@@ -32,6 +42,7 @@
  *   automatischeSomtodayBoodschap: boolean,
  *   verzenderNaam: string,
  *   ontvangerNamen: string[],
+ *   bijlages: Bijlage[],
  * }} Boodschap
  */
 
@@ -281,6 +292,93 @@ function additionalValue(additional, key) {
   return /** @type {Record<string, unknown>} */ (additional)[key];
 }
 
+/** Assembly types leerling-source accepts for downloadable bijlagen. */
+const BIJLAGE_TYPES = new Set(["IMAGE", "VIDEO", "DOCUMENT", "MISC", "AUDIO"]);
+
+/**
+ * Pick the downloadable assembly result (leerling-source `getAssemblyResult`).
+ * @param {unknown} assemblyResults
+ * @returns {Record<string, unknown> | null}
+ */
+function getAssemblyResult(assemblyResults) {
+  if (!Array.isArray(assemblyResults)) return null;
+  for (const item of assemblyResults) {
+    if (!item || typeof item !== "object") continue;
+    const a = /** @type {Record<string, unknown>} */ (item);
+    if (typeof a.assemblyFileType === "string" && BIJLAGE_TYPES.has(a.assemblyFileType)) {
+      return a;
+    }
+  }
+  return null;
+}
+
+/**
+ * Map `RBoodschap.bijlages` (wire spelling with *e*) → downloadable attachment.
+ * Source: leerling-source `mapBoodschapBijlage`.
+ * @param {unknown} raw
+ * @returns {Bijlage | null}
+ */
+function mapBoodschapBijlage(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const b = /** @type {Record<string, unknown>} */ (raw);
+  const id = selfLinkId(b.links);
+  const assembly = getAssemblyResult(b.assemblyResults);
+  if (id == null || !assembly) return null;
+  const fileUrl = typeof assembly.fileUrl === "string" ? assembly.fileUrl.trim() : "";
+  const fileExtension = typeof assembly.fileExtension === "string" ? assembly.fileExtension.trim() : "";
+  const fileSize = Number(assembly.fileSize);
+  if (!fileUrl || !fileExtension || !Number.isFinite(fileSize) || fileSize <= 0) return null;
+  // Only open absolute http(s) URLs (signed CDN links from Somtoday).
+  if (!/^https?:\/\//i.test(fileUrl)) return null;
+  const omschrijving =
+    (typeof b.omschrijving === "string" && b.omschrijving.trim())
+    || (typeof assembly.fileName === "string" && assembly.fileName.trim())
+    || "Bijlage";
+  return { id, omschrijving, fileUrl, fileExtension, fileSize };
+}
+
+/**
+ * @param {number} bytes
+ */
+function formatFileSize(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(bytes < 10 * 1024 ? 1 : 0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(bytes < 10 * 1024 * 1024 ? 1 : 0)} MB`;
+}
+
+/**
+ * Open attachment in the system browser / Electron external handler.
+ * Leerling-source uses `SsoService.openExternalLink(fileUrl)` → `window.open`.
+ * @param {string} url
+ */
+function openBijlage(url) {
+  if (!/^https?:\/\//i.test(url)) return;
+  const opened = window.open(url, "_blank", "noopener,noreferrer");
+  if (!opened) {
+    // Sandbox without allow-popups: fall back to same-frame navigation.
+    window.location.assign(url);
+  }
+}
+
+/**
+ * @param {Bijlage[]} bijlages
+ */
+function renderBijlagesHtml(bijlages) {
+  if (!bijlages.length) return "";
+  const items = bijlages
+    .map((b) => {
+      const size = formatFileSize(b.fileSize);
+      const meta = [b.fileExtension.toUpperCase(), size].filter(Boolean).join(" · ");
+      return `<button type="button" class="bijlage-btn" data-bijlage-url="${escapeHtml(b.fileUrl)}" title="Open bijlage">
+          <span class="bijlage-name">${escapeHtml(b.omschrijving)}</span>
+          <span class="bijlage-meta">${escapeHtml(meta)}</span>
+        </button>`;
+    })
+    .join("");
+  return `<div class="bijlages" aria-label="Bijlagen">${items}</div>`;
+}
+
 /**
  * @param {unknown} raw
  * @returns {Boodschap | null}
@@ -307,6 +405,16 @@ function mapBoodschap(raw) {
   const actief = additionalValue(additional, "actiefVoorGebruiker");
   if (actief === false) return null;
 
+  /** @type {Bijlage[]} */
+  const bijlages = [];
+  // Wire field is *bijlages* (with e), not bijlagen — see shapes.md / leerling-source.
+  if (Array.isArray(b.bijlages)) {
+    for (const item of b.bijlages) {
+      const mapped = mapBoodschapBijlage(item);
+      if (mapped) bijlages.push(mapped);
+    }
+  }
+
   return {
     id,
     onderwerp: typeof b.onderwerp === "string" ? b.onderwerp : "(geen onderwerp)",
@@ -317,6 +425,7 @@ function mapBoodschap(raw) {
     automatischeSomtodayBoodschap: Boolean(b.automatischeSomtodayBoodschap),
     verzenderNaam: personLabel(verzender) || (verzondenDoorGebruiker ? "Jij" : "Onbekend"),
     ontvangerNamen,
+    bijlages,
   };
 }
 
@@ -534,9 +643,11 @@ function renderList() {
       const active = selectedKey === c.key ? " is-active" : "";
       const unread = c.unread ? " is-unread" : "";
       const dot = c.unread ? `<span class="unread-dot" aria-hidden="true"></span>` : "";
+      const hasBijlage = c.boodschappen.some((m) => m.bijlages.length > 0);
+      const bijlageMeta = hasBijlage ? " · bijlage" : "";
       return `<button type="button" class="thread-btn${active}${unread}" data-conv-key="${escapeHtml(c.key)}">
           <span class="thread-subject">${dot}${escapeHtml(c.onderwerp)}</span>
-          <span class="thread-meta">${escapeHtml(c.counterpart)} · ${escapeHtml(formatDateTime(c.when))}</span>
+          <span class="thread-meta">${escapeHtml(c.counterpart)} · ${escapeHtml(formatDateTime(c.when))}${bijlageMeta}</span>
           <span class="thread-preview">${escapeHtml(c.preview || "")}</span>
         </button>`;
     })
@@ -616,6 +727,7 @@ function renderDetail() {
           <span class="message-date">${escapeHtml(formatDateTime(m.verzendDatum))}</span>
         </div>
         <div class="message-body">${formatMessageBodyHtml(m.inhoud)}</div>
+        ${renderBijlagesHtml(m.bijlages)}
       </article>`;
     })
     .join("");
@@ -648,6 +760,13 @@ function renderDetail() {
     </div>
     <div class="message-stack">${messagesHtml}</div>
     ${replyHtml}`;
+
+  detailEl.querySelectorAll("[data-bijlage-url]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const url = btn.getAttribute("data-bijlage-url");
+      if (url) openBijlage(url);
+    });
+  });
 
   const replyForm = /** @type {HTMLFormElement | null} */ (document.getElementById("replyForm"));
   if (replyForm && replyTarget) {

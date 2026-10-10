@@ -524,6 +524,24 @@ export type SomtodayMedewerker = SomtodayEntity & {
 
 export type SomtodayBoodschapPrioriteit = "URGENT" | "HOOG" | "NORMAAL" | "LAAG" | string;
 
+/** Downloadable file variant inside a bijlage (`RAssemblyResult`). */
+export type SomtodayAssemblyResult = {
+  $type?: string;
+  fileUrl?: string;
+  fileName?: string;
+  fileSize?: number;
+  fileExtension?: string;
+  /** e.g. `IMAGE` | `VIDEO` | `DOCUMENT` | `MISC` | `AUDIO` */
+  assemblyFileType?: string;
+};
+
+/** Message attachment (`RBoodschapBijlage`) — nested under `bijlages`. */
+export type SomtodayBoodschapBijlage = SomtodayEntity & {
+  omschrijving?: string;
+  sortering?: number;
+  assemblyResults?: SomtodayAssemblyResult[];
+};
+
 export type SomtodayBoodschapCorrespondent = {
   $type?: string;
   naam?: string;
@@ -544,8 +562,12 @@ export type SomtodayBoodschap = SomtodayEntity & {
   mimeType?: string;
   prioriteit?: SomtodayBoodschapPrioriteit;
   notificatieType?: string;
-  /** Wire spelling uses *bijlages* (with e), not bijlagen. */
-  bijlages?: unknown[];
+  /**
+   * Wire spelling uses *bijlages* (with e), not bijlagen.
+   * Each item has `omschrijving`, `sortering`, and `assemblyResults[]`
+   * (`fileUrl`, `fileSize`, `fileExtension`, `assemblyFileType`, `fileName`).
+   */
+  bijlages?: SomtodayBoodschapBijlage[];
   additionalObjects?: {
     aantalExtraOntvangers?: number;
     verzondenDoorGebruiker?: boolean;

@@ -1,7 +1,7 @@
 {
   "id": "berichten",
   "name": "Berichten",
-  "version": "1.0.4",
+  "version": "1.0.6",
   "description": "Inbox, verzonden en concepten; berichten aan docenten sturen en beantwoorden",
   "author": "Sam Hijmans",
   "kind": "page",

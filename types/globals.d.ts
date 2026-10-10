@@ -18,7 +18,9 @@ import type {
   SomtodayAfspraakItem as _SomtodayAfspraakItem,
   SomtodayAfspraakItemType as _SomtodayAfspraakItemType,
   SomtodayAfspraakType as _SomtodayAfspraakType,
+  SomtodayAssemblyResult as _SomtodayAssemblyResult,
   SomtodayBoodschap as _SomtodayBoodschap,
+  SomtodayBoodschapBijlage as _SomtodayBoodschapBijlage,
   SomtodayBoodschapConversatie as _SomtodayBoodschapConversatie,
   SomtodayBoodschapCorrespondent as _SomtodayBoodschapCorrespondent,
   SomtodayBoodschapPrioriteit as _SomtodayBoodschapPrioriteit,
@@ -87,6 +89,8 @@ declare global {
   type SomtodayAccount = _SomtodayAccount;
   type SomtodayMedewerker = _SomtodayMedewerker;
   type SomtodayBoodschapPrioriteit = _SomtodayBoodschapPrioriteit;
+  type SomtodayAssemblyResult = _SomtodayAssemblyResult;
+  type SomtodayBoodschapBijlage = _SomtodayBoodschapBijlage;
   type SomtodayBoodschapCorrespondent = _SomtodayBoodschapCorrespondent;
   type SomtodayBoodschap = _SomtodayBoodschap;
   type SomtodayBoodschapConversatie = _SomtodayBoodschapConversatie;

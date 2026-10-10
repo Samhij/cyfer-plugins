@@ -328,6 +328,64 @@ body {
   color: var(--accent);
 }
 
+.bijlages {
+  margin-top: 0.7rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+}
+
+.bijlages-label {
+  margin: 0 0 0.35rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.bijlages-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.bijlage-btn {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 0.75rem;
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--bg-elevated) 70%, transparent);
+  color: var(--ink);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.bijlage-btn:hover,
+.bijlage-btn:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: color-mix(in srgb, var(--accent-soft) 55%, var(--bg-elevated));
+  outline: none;
+}
+
+.bijlage-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  word-break: break-word;
+}
+
+.bijlage-meta {
+  color: var(--muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
 .reply-box,
 .draft-actions {
   display: flex;

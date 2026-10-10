@@ -24,6 +24,16 @@
 /**
  * @typedef {{
  *   id: number,
+ *   omschrijving: string,
+ *   fileUrl: string,
+ *   fileExtension: string,
+ *   fileSize: number,
+ * }} Bijlage
+ */
+
+/**
+ * @typedef {{
+ *   id: number,
  *   onderwerp: string,
  *   inhoud: string,
  *   verzendDatum: string | null,
@@ -32,6 +42,7 @@
  *   automatischeSomtodayBoodschap: boolean,
  *   verzenderNaam: string,
  *   ontvangerNamen: string[],
+ *   bijlages: Bijlage[],
  * }} Boodschap
  */
 
@@ -122,14 +133,21 @@ function escapeHtml(value) {
 }
 
 /**
+ * Entity id from links — leerling-source `getEntiteitId` prefers `self`, then `koppeling`
+ * (bijlagen use `rel: "koppeling"`, not `self`).
  * @param {unknown} links
  * @returns {number | null}
  */
 function selfLinkId(links) {
   if (!Array.isArray(links) || links.length === 0) return null;
-  const self = links.find((l) => l && typeof l === "object" && /** @type {{rel?: string}} */ (l).rel === "self") || links[0];
-  if (!self || typeof self !== "object") return null;
-  const id = /** @type {{id?: number|string}} */ (self).id;
+  /** @type {unknown[]} */
+  const list = links;
+  const prefer =
+    list.find((l) => l && typeof l === "object" && /** @type {{rel?: string}} */ (l).rel === "self")
+    || list.find((l) => l && typeof l === "object" && /** @type {{rel?: string}} */ (l).rel === "koppeling")
+    || list[0];
+  if (!prefer || typeof prefer !== "object") return null;
+  const id = /** @type {{id?: number|string}} */ (prefer).id;
   if (id == null || id === "") return null;
   const n = Number(id);
   return Number.isFinite(n) ? n : null;
@@ -281,6 +299,140 @@ function additionalValue(additional, key) {
   return /** @type {Record<string, unknown>} */ (additional)[key];
 }
 
+/** Assembly types leerling-source accepts for downloadable bijlagen. */
+const BIJLAGE_TYPES = new Set(["IMAGE", "VIDEO", "DOCUMENT", "MISC", "AUDIO"]);
+
+/** Match official leerling REST Accept (platinum); plain application/json can omit nested bijlage fields. */
+const PLATINUM_ACCEPT = "application/vnd.topicus.platinum+json; charset=utf-8";
+
+/**
+ * Absolute http(s) URL from assembly `fileUrl` / `sslUrl` (prefer SSL when both present).
+ * @param {Record<string, unknown>} assembly
+ */
+function assemblyFileUrl(assembly) {
+  const candidates = [assembly.sslUrl, assembly.fileUrl];
+  for (const raw of candidates) {
+    if (typeof raw !== "string") continue;
+    const url = raw.trim();
+    if (/^https?:\/\//i.test(url)) return url;
+    if (url.startsWith("//")) return `https:${url}`;
+  }
+  return "";
+}
+
+/**
+ * Pick the downloadable assembly result (leerling-source `getAssemblyResult`),
+ * with a fallback to any assembly that has an absolute file URL.
+ * @param {unknown} assemblyResults
+ * @returns {Record<string, unknown> | null}
+ */
+function getAssemblyResult(assemblyResults) {
+  if (!Array.isArray(assemblyResults)) return null;
+  /** @type {Record<string, unknown> | null} */
+  let typed = null;
+  /** @type {Record<string, unknown> | null} */
+  let anyWithUrl = null;
+  for (const item of assemblyResults) {
+    if (!item || typeof item !== "object") continue;
+    const a = /** @type {Record<string, unknown>} */ (item);
+    const type = typeof a.assemblyFileType === "string" ? a.assemblyFileType.toUpperCase() : "";
+    if (!typed && type && BIJLAGE_TYPES.has(type)) typed = a;
+    if (!anyWithUrl && assemblyFileUrl(a)) anyWithUrl = a;
+  }
+  return typed || anyWithUrl;
+}
+
+/**
+ * Normalize `bijlages` / `bijlagen` from a boodschap (array or `{ items: [] }` envelope).
+ * @param {Record<string, unknown>} boodschap
+ * @returns {unknown[]}
+ */
+function rawBijlageList(boodschap) {
+  const candidates = [boodschap.bijlages, boodschap.bijlagen];
+  for (const raw of candidates) {
+    if (Array.isArray(raw)) return raw;
+    if (raw && typeof raw === "object") {
+      const items = /** @type {{items?: unknown}} */ (raw).items;
+      if (Array.isArray(items)) return items;
+    }
+  }
+  return [];
+}
+
+/**
+ * Map `RBoodschap.bijlages` (wire spelling with *e*) → downloadable attachment.
+ * Source: leerling-source `mapBoodschapBijlage` + elisaado conversaties sample.
+ * @param {unknown} raw
+ * @param {number} fallbackIndex
+ * @returns {Bijlage | null}
+ */
+function mapBoodschapBijlage(raw, fallbackIndex = 0) {
+  if (!raw || typeof raw !== "object") return null;
+  const b = /** @type {Record<string, unknown>} */ (raw);
+  const id = selfLinkId(b.links) ?? -(fallbackIndex + 1);
+  const assembly = getAssemblyResult(b.assemblyResults);
+  if (!assembly) return null;
+  const fileUrl = assemblyFileUrl(assembly);
+  if (!fileUrl) return null;
+  let fileExtension = typeof assembly.fileExtension === "string" ? assembly.fileExtension.trim() : "";
+  const fileName = typeof assembly.fileName === "string" ? assembly.fileName.trim() : "";
+  if (!fileExtension && fileName.includes(".")) {
+    fileExtension = fileName.slice(fileName.lastIndexOf(".") + 1);
+  }
+  const sizeNum = Number(assembly.fileSize);
+  const fileSize = Number.isFinite(sizeNum) && sizeNum > 0 ? sizeNum : 0;
+  const omschrijving =
+    (typeof b.omschrijving === "string" && b.omschrijving.trim())
+    || fileName
+    || (fileExtension ? `Bijlage.${fileExtension}` : "Bijlage");
+  return { id, omschrijving, fileUrl, fileExtension: fileExtension || "file", fileSize };
+}
+
+/**
+ * @param {number} bytes
+ */
+function formatFileSize(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(bytes < 10 * 1024 ? 1 : 0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(bytes < 10 * 1024 * 1024 ? 1 : 0)} MB`;
+}
+
+/**
+ * Open attachment in the system browser / Electron external handler.
+ * Leerling-source uses `SsoService.openExternalLink(fileUrl)` → `window.open`.
+ * @param {string} url
+ */
+function openBijlage(url) {
+  if (!/^https?:\/\//i.test(url)) return;
+  const opened = window.open(url, "_blank", "noopener,noreferrer");
+  if (!opened) {
+    // Sandbox without allow-popups: fall back to same-frame navigation.
+    window.location.assign(url);
+  }
+}
+
+/**
+ * @param {Bijlage[]} bijlages
+ */
+function renderBijlagesHtml(bijlages) {
+  if (!bijlages.length) return "";
+  const items = bijlages
+    .map((b) => {
+      const size = formatFileSize(b.fileSize);
+      const meta = [b.fileExtension.toUpperCase(), size].filter(Boolean).join(" · ");
+      return `<button type="button" class="bijlage-btn" data-bijlage-url="${escapeHtml(b.fileUrl)}" title="Open bijlage">
+          <span class="bijlage-name">${escapeHtml(b.omschrijving)}</span>
+          <span class="bijlage-meta">${escapeHtml(meta)}</span>
+        </button>`;
+    })
+    .join("");
+  return `<div class="bijlages">
+      <p class="bijlages-label">Bijlagen</p>
+      <div class="bijlages-list" aria-label="Bijlagen">${items}</div>
+    </div>`;
+}
+
 /**
  * @param {unknown} raw
  * @returns {Boodschap | null}
@@ -307,6 +459,14 @@ function mapBoodschap(raw) {
   const actief = additionalValue(additional, "actiefVoorGebruiker");
   if (actief === false) return null;
 
+  /** @type {Bijlage[]} */
+  const bijlages = [];
+  // Wire field is *bijlages* (with e); also accept bijlagen / items wrapper.
+  rawBijlageList(b).forEach((item, index) => {
+    const mapped = mapBoodschapBijlage(item, index);
+    if (mapped) bijlages.push(mapped);
+  });
+
   return {
     id,
     onderwerp: typeof b.onderwerp === "string" ? b.onderwerp : "(geen onderwerp)",
@@ -317,6 +477,7 @@ function mapBoodschap(raw) {
     automatischeSomtodayBoodschap: Boolean(b.automatischeSomtodayBoodschap),
     verzenderNaam: personLabel(verzender) || (verzondenDoorGebruiker ? "Jij" : "Onbekend"),
     ontvangerNamen,
+    bijlages,
   };
 }
 
@@ -534,9 +695,11 @@ function renderList() {
       const active = selectedKey === c.key ? " is-active" : "";
       const unread = c.unread ? " is-unread" : "";
       const dot = c.unread ? `<span class="unread-dot" aria-hidden="true"></span>` : "";
+      const hasBijlage = c.boodschappen.some((m) => m.bijlages.length > 0);
+      const bijlageMeta = hasBijlage ? " · bijlage" : "";
       return `<button type="button" class="thread-btn${active}${unread}" data-conv-key="${escapeHtml(c.key)}">
           <span class="thread-subject">${dot}${escapeHtml(c.onderwerp)}</span>
-          <span class="thread-meta">${escapeHtml(c.counterpart)} · ${escapeHtml(formatDateTime(c.when))}</span>
+          <span class="thread-meta">${escapeHtml(c.counterpart)} · ${escapeHtml(formatDateTime(c.when))}${bijlageMeta}</span>
           <span class="thread-preview">${escapeHtml(c.preview || "")}</span>
         </button>`;
     })
@@ -616,6 +779,7 @@ function renderDetail() {
           <span class="message-date">${escapeHtml(formatDateTime(m.verzendDatum))}</span>
         </div>
         <div class="message-body">${formatMessageBodyHtml(m.inhoud)}</div>
+        ${renderBijlagesHtml(m.bijlages)}
       </article>`;
     })
     .join("");
@@ -648,6 +812,13 @@ function renderDetail() {
     </div>
     <div class="message-stack">${messagesHtml}</div>
     ${replyHtml}`;
+
+  detailEl.querySelectorAll("[data-bijlage-url]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const url = btn.getAttribute("data-bijlage-url");
+      if (url) openBijlage(url);
+    });
+  });
 
   const replyForm = /** @type {HTMLFormElement | null} */ (document.getElementById("replyForm"));
   if (replyForm && replyTarget) {
@@ -1163,9 +1334,21 @@ async function loadRestricties() {
 
 async function refreshConversaties() {
   const data = /** @type {any} */ (
-    await cyfers.fetch(`/rest/v1/boodschappen/conversaties?${CONVERSATIE_ADDITIONAL}`)
+    await cyfers.fetch(`/rest/v1/boodschappen/conversaties?${CONVERSATIE_ADDITIONAL}`, {
+      // Official leerling client uses platinum Accept; keeps nested bijlages/assemblyResults.
+      headers: {
+        accept: PLATINUM_ACCEPT,
+        range: "items=0-199",
+      },
+    })
   );
-  const items = Array.isArray(data?.items) ? data.items : [];
+  const items = Array.isArray(data?.items)
+    ? data.items
+    : Array.isArray(data?.content)
+      ? data.content
+      : Array.isArray(data)
+        ? data
+        : [];
   /** @type {Conversatie[]} */
   const mapped = [];
   for (const item of items) {
